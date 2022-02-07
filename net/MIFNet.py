@@ -37,6 +37,5 @@ class MultiInfoNet(nn.Module):
             stkFeaMap: Stk Data Encode                    | shape = BS * 1 * H * W
         """ 
         stkFeaMap = self.STKEncoder(gather, cv, VMM)
-        xSE = self.SE_Block(torch.cat((spec, stkFeaMap), 1))
-        x = self.UNet(xSE)
+        x = self.UNet(torch.cat((spec, stkFeaMap), 1))
         return x, stkFeaMap

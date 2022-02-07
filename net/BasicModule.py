@@ -63,6 +63,7 @@ class GatherEncoder(nn.Module):
         :param mode: P --> positive part
                      N --> Negative part
                      all --> all data
+                     mute --> keep original signal
         """
 
         self.mode = mode
@@ -83,8 +84,10 @@ class GatherEncoder(nn.Module):
             FeaX = PosP
         elif self.mode == 'N':
             FeaX = NegP
-        else:
+        elif self.mode == 'all':
             FeaX = PosP + NegP
+        else:
+            FeaX = PosP - NegP
 
         ########### encode gather information ########################
         # extract multi-scale feature by SPP
