@@ -26,12 +26,9 @@ sys.path.append('..')
 warnings.filterwarnings("ignore")
 
 
-"""====== train & valid load in base dataset ========="""
-
-
 def CheckSavePath():
     basicFile = ['log', 'model', 'TBLog']
-    BaseName = '%s_%d_%.1f' % (opt.DataSet, opt.Resize[0], opt.SeedRate)
+    BaseName = '%s_%d_%.1f_%s' % (opt.DataSet, opt.Resize[0], opt.SeedRate, opt.SGSMode)
     for ind, file in enumerate(basicFile):
         if ind == 3:
             Path = os.path.join(opt.OutputPath, file, BaseName)
@@ -48,19 +45,19 @@ def train():
     print('==== Begin to train ====')
     # check output folder and check path
     opt.Resize = [int(opt.SizeH), int(opt.SizeH/2)]
-    TBPath = os.path.join(opt.OutputPath, 'TBLog', '%s_%d_%.1f' % (opt.DataSet, opt.Resize[0], opt.SeedRate))
+    TBPath = os.path.join(opt.OutputPath, 'TBLog', '%s_%d_%.1f_%s' % (opt.DataSet, opt.Resize[0], opt.SeedRate, opt.SGSMode))
     CheckSavePath()
 
     opt.OutputPath = os.path.join(opt.OutputPath, opt.DataSet)
     OutputPath = opt.OutputPath
-    BestPath = os.path.join(OutputPath, 'model', '%s_%d_%.1f.pth' % (opt.DataSet, opt.Resize[0], opt.SeedRate))
+    BestPath = os.path.join(OutputPath, 'model', '%s_%d_%.1f_%s.pth' % (opt.DataSet, opt.Resize[0], opt.SeedRate, opt.SGSMode))
 
     # setup the logger
-    LogPath = os.path.join(OutputPath, 'log', '%s_%d_%.1f' % (opt.DataSet, opt.Resize[0], opt.SeedRate))
+    LogPath = os.path.join(OutputPath, 'log', '%s_%d_%.1f_%s' % (opt.DataSet, opt.Resize[0], opt.SeedRate, opt.SGSMode))
     setup_logger(LogPath)
     writer = SummaryWriter(TBPath)
     logger = logging.getLogger()
-    logger.info('Training --- DataSet=%s  SizeH=%d SeedRate=%.1f' % (opt.DataSet, opt.Resize[0], opt.SeedRate))
+    logger.info('Training --- DataSet=%s  SizeH=%d SeedRate=%.1f SGSMode=%s' % (opt.DataSet, opt.Resize[0], opt.SeedRate, opt.SGSMode))
 
     # load segy data
     SegyName = {'pwr': 'vel.pwr.sgy',
@@ -114,7 +111,7 @@ def train():
     use_gpu = torch.cuda.device_count() > 0
 
     # load network
-    net = MultiInfoNet(T0Ind, opt, in_channels=11, resize=opt.Resize)
+    net = MultiInfoNet(T0Ind, opt, in_channels=11, resize=opt.Resize, mode=opt.SGSMode)
     if use_gpu:
         net = net.cuda(opt.GPUNO)
     net.train()
@@ -244,6 +241,7 @@ if __name__ == '__main__':
     parser.add_argument('--DataSetRoot', type=str, help='Dataset Root Path')
     parser.add_argument('--DataSet', type=str, default='hade1', help='Dataset Root Path')
     parser.add_argument('--OutputPath', type=str, default='result', help='Path of Output')
+    parser.add_argument('--SGSMode', type=str, default='all')
     parser.add_argument('--GatherLen', type=int, default=21)
     parser.add_argument('--SeedRate', type=float, default=0.5)
     parser.add_argument('--ReTrain', type=int, default=1)

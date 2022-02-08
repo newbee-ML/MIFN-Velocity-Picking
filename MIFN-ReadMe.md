@@ -91,6 +91,7 @@ python utils/BuiltStkDataSet.py /Root
 | DataSetRoot | str   | 无     | 数据集根目录地址                                 |
 | DataSet     | str   | test   | 训练集名称（用于记录训练结果，可任意命名）       |
 | GatherLen   | int   | 21     | 单个叠加段最大宽度，用于编码，注意必须是最大宽度 |
+| SGSMode     | str   | all    | 叠加段道集编码方式 all (正负分离并叠加), mute(正常标准化)|
 | SeedRate    | float | 0.5    | 训练集占数据集的比例                             |
 | ReTrain     | int   | 1      | 是否重新训练                                     |
 | GPUNO       | int   | 0      | 训练所用GPU编号                                  |

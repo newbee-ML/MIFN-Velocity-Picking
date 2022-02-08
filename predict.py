@@ -147,6 +147,7 @@ if __name__ == '__main__':
     parser.add_argument('--GatherLen', type=int, default=21)
     parser.add_argument('--LoadModel', type=str, help='Model Path')
     parser.add_argument('--OutputPath', type=str, default='result', help='Path of Output')
+    parser.add_argument('--SGSMode', type=str, default='all')
     parser.add_argument('--Predthre', type=float, default=0.3)
     parser.add_argument('--Resave', type=int, default=0)
     parser.add_argument('--GPUNO', type=int, default=0)
