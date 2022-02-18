@@ -80,14 +80,14 @@ class GatherEncoder(nn.Module):
         # default: split = positive + (-negative)
         NegP = -torch.where(x > 0, torch.zeros_like(x), x)
         PosP = torch.where(x < 0, torch.zeros_like(x), x)
-        if self.mode == 'P':
-            FeaX = PosP
-        elif self.mode == 'N':
-            FeaX = NegP
-        elif self.mode == 'all':
+        if self.mode == 'all':
             FeaX = PosP + NegP
         else:
-            FeaX = PosP - NegP
+            FeaX = x
+        
+        # scale the value to [0, 1] for 'all' or [-1, 1] for 'mute'
+        MaxValue = max(torch.max(NegP), torch.max(PosP))
+        FeaX /= MaxValue  
 
         ########### encode gather information ########################
         # extract multi-scale feature by SPP
@@ -286,29 +286,6 @@ class UNet(nn.Module):
         out = self.last(out)  # 1     H       W
 
         return out
-
-
-# Squeeze-and-Excitation Networks
-class SEBlock(nn.Module):
-    def __init__(self, inchannel):
-        super(SEBlock, self).__init__()
-        self.avg_pool = nn.AdaptiveAvgPool2d(1)
-        self.fc = nn.Sequential(
-            nn.Linear(inchannel, 5, bias=False),
-            nn.ReLU(inplace=True),
-            nn.Linear(5, inchannel, bias=False),
-            nn.Sigmoid(),
-        )
-
-    def forward(self, x):
-        b, c, _, _ = x.size()
-        # Squeeze
-        y = self.avg_pool(x).view(b, c)
-        # Excitation
-        y = self.fc(y).view(b, c, 1, 1)
-        # F scale
-        y = torch.mul(x, y)
-        return y
 
         
 if __name__ == '__main__':
