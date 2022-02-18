@@ -42,7 +42,7 @@ class SPP(nn.Module):
         self.CBL1 = CBL(1, 1)
         self.CBL2 = CBL(3, 2)
         self.CBL3 = CBL(2, 1)
-        self.Pool1 = nn.MaxPool2d(kernel_size=3,stride=1,padding=3 // 2)
+        self.Pool1 = nn.MaxPool2d(kernel_size=3,stride=1, padding=3 // 2)
         self.Pool2 = nn.MaxPool2d(kernel_size=5, stride=1, padding=5 // 2)
  
     def forward(self, x):
@@ -60,9 +60,7 @@ class GatherEncoder(nn.Module):
     def __init__(self, outLen=512, mode='all'):
         super(GatherEncoder, self).__init__()
         """
-        :param mode: P --> positive part
-                     N --> Negative part
-                     all --> all data
+        :param mode: all --> absolute signals 
                      mute --> keep original signal
         """
 
@@ -76,17 +74,13 @@ class GatherEncoder(nn.Module):
 
         :return: gather encode       | shape =  N*1*outLen*1
         """
-        ########### split positive and negative ######################
-        # default: split = positive + (-negative)
-        NegP = -torch.where(x > 0, torch.zeros_like(x), x)
-        PosP = torch.where(x < 0, torch.zeros_like(x), x)
+        ########### scale the gather signals ######################
         if self.mode == 'all':
-            FeaX = PosP + NegP
+            FeaX = torch.abs(x)
         else:
             FeaX = x
-        
         # scale the value to [0, 1] for 'all' or [-1, 1] for 'mute'
-        MaxValue = max(torch.max(NegP), torch.max(PosP))
+        MaxValue = torch.max(torch.abs(x))
         FeaX /= MaxValue  
 
         ########### encode gather information ########################
