@@ -13,7 +13,6 @@ class MultiInfoNet(nn.Module):
         """
         super(MultiInfoNet, self).__init__()
         self.UNet = UNet(in_channels)
-        self.SE_Block = SEBlock(in_channels)
         self.STKEncoder = STKEncoder(tInt, opt, resize=resize, mode=mode)
         self.initialize()
 
