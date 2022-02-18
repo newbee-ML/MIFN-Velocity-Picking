@@ -29,7 +29,7 @@ warnings.filterwarnings("ignore")
 def CheckSavePath(BaseName):
     basicFile = ['log', 'model', 'TBLog']
     for ind, file in enumerate(basicFile):
-        if ind == 3:
+        if ind == 2:
             Path = os.path.join(opt.OutputPath, file, BaseName)
         else:
             Path = os.path.join(opt.OutputPath, opt.DataSet, file, BaseName)
@@ -87,8 +87,8 @@ def train():
 
     # find common index
     Index = sorted(list((pwr_index & stk_index) & (gth_index & set(HaveLabelIndex))))
-    trainIndex, _ = train_test_split(Index, test_size=1-opt.SeedRate, random_state=123)
-    trainIndex, validIndex = train_test_split(trainIndex, test_size=0.2, random_state=123)
+    trainIndex, testIndex = train_test_split(Index, test_size=0.2, random_state=123)
+    trainIndex, _ = train_test_split(trainIndex, test_size=1-opt.SeedRate, random_state=123)
 
     # load t0 ind and v ind
     T0Ind = np.array(SegyDict['pwr'].samples)
@@ -96,7 +96,7 @@ def train():
 
     # build data loader
     ds = DLSpec(SegyDict, H5Dict, LabelDict, trainIndex, T0Ind, resize=opt.Resize, GatherLen=opt.GatherLen)
-    dsval = DLSpec(SegyDict, H5Dict, LabelDict, validIndex, T0Ind, resize=opt.Resize, GatherLen=opt.GatherLen)
+    dsval = DLSpec(SegyDict, H5Dict, LabelDict, testIndex, T0Ind, resize=opt.Resize, GatherLen=opt.GatherLen)
     dl = DataLoader(ds,
                     batch_size=opt.trainBS,
                     shuffle=True,
