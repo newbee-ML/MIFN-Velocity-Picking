@@ -1,2 +1,2 @@
-python train.py --DataSetRoot E:\Spectrum\hade --DataSet hade --GatherLen 15 --SeedRate 0.6 --trainBS 16 --OutputPath F:\VSP-MIFN\0Ablation --GPUNO 0
-python train.py --DataSetRoot E:\Spectrum\hade --DataSet hade --GatherLen 15 --SeedRate 0.6 --trainBS 16 --OutputPath F:\VSP-MIFN\0Ablation --GPUNO 0 --SGSMode mute
+python train.py --DataSetRoot E:\Spectrum\hade --DataSet hade --GatherLen 15 --SeedRate 0.8 --trainBS 8 --OutputPath F:\VSP-MIFN\0Ablation --GPUNO 0
+python train.py --DataSetRoot E:\Spectrum\hade --DataSet hade --GatherLen 15 --SeedRate 0.8 --trainBS 8 --OutputPath F:\VSP-MIFN\0Ablation --GPUNO 0 --SGSMode mute

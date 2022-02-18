@@ -26,9 +26,8 @@ sys.path.append('..')
 warnings.filterwarnings("ignore")
 
 
-def CheckSavePath():
+def CheckSavePath(BaseName):
     basicFile = ['log', 'model', 'TBLog']
-    BaseName = '%s_%d_%.1f_%s' % (opt.DataSet, opt.Resize[0], opt.SeedRate, opt.SGSMode)
     for ind, file in enumerate(basicFile):
         if ind == 3:
             Path = os.path.join(opt.OutputPath, file, BaseName)
@@ -43,21 +42,23 @@ def CheckSavePath():
 
 def train():
     print('==== Begin to train ====')
+    # BaseName
+    BaseName = 'DS_%s-SR_%.2f-LR_%.4f-BS_%d-SH_%d-PT_%.2f-SGSM_%s' % (opt.DataSet, opt.SeedRate, opt.lrStart, opt.trainBS, opt.SizeH, opt.Predthre, opt.SGSMode)
     # check output folder and check path
     opt.Resize = [int(opt.SizeH), int(opt.SizeH/2)]
-    TBPath = os.path.join(opt.OutputPath, 'TBLog', '%s_%d_%.1f_%s' % (opt.DataSet, opt.Resize[0], opt.SeedRate, opt.SGSMode))
-    CheckSavePath()
+    TBPath = os.path.join(opt.OutputPath, 'TBLog', BaseName)
+    CheckSavePath(BaseName)
 
     opt.OutputPath = os.path.join(opt.OutputPath, opt.DataSet)
     OutputPath = opt.OutputPath
-    BestPath = os.path.join(OutputPath, 'model', '%s_%d_%.1f_%s.pth' % (opt.DataSet, opt.Resize[0], opt.SeedRate, opt.SGSMode))
+    BestPath = os.path.join(OutputPath, 'model', '%s.pth' % BaseName)
 
     # setup the logger
-    LogPath = os.path.join(OutputPath, 'log', '%s_%d_%.1f_%s' % (opt.DataSet, opt.Resize[0], opt.SeedRate, opt.SGSMode))
+    LogPath = os.path.join(OutputPath, 'log', BaseName)
     setup_logger(LogPath)
     writer = SummaryWriter(TBPath)
     logger = logging.getLogger()
-    logger.info('Training --- DataSet=%s  SizeH=%d SeedRate=%.1f SGSMode=%s' % (opt.DataSet, opt.Resize[0], opt.SeedRate, opt.SGSMode))
+    logger.info('Training --- %s' % BaseName)
 
     # load segy data
     SegyName = {'pwr': 'vel.pwr.sgy',
@@ -86,7 +87,8 @@ def train():
 
     # find common index
     Index = sorted(list((pwr_index & stk_index) & (gth_index & set(HaveLabelIndex))))
-    trainIndex, validIndex = train_test_split(Index, test_size=1-opt.SeedRate, random_state=2333)
+    trainIndex, _ = train_test_split(Index, test_size=1-opt.SeedRate, random_state=123)
+    trainIndex, validIndex = train_test_split(trainIndex, test_size=0.2, random_state=123)
 
     # load t0 ind and v ind
     T0Ind = np.array(SegyDict['pwr'].samples)
