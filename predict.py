@@ -18,7 +18,6 @@ from utils.LoadData import DLSpec
 
 warnings.filterwarnings("ignore")
 
-"""====== Predict All Data ========="""
 
 
 def CheckSavePath(opt):

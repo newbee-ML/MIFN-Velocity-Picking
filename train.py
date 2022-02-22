@@ -89,6 +89,7 @@ def train():
     Index = sorted(list((pwr_index & stk_index) & (gth_index & set(HaveLabelIndex))))
     trainIndex, testIndex = train_test_split(Index, test_size=0.2, random_state=123)
     trainIndex, _ = train_test_split(trainIndex, test_size=1-opt.SeedRate, random_state=123)
+    print('Train Num %d, Valid Num %d' % (len(trainIndex), len(testIndex)))
 
     # load t0 ind and v ind
     T0Ind = np.array(SegyDict['pwr'].samples)
