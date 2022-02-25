@@ -173,6 +173,19 @@ def generate_feature_map(ori_spec, resize, visual=0):
     return feature_map
 
 
+# Padding for stk gather 
+def STKPadding(StkGather, GthLen):
+    K, H, Olen = StkGather.shape
+    PaddingNew = np.zeros((K, H, GthLen), dtype=np.float32)
+    PadNum = int((GthLen - Olen)/2)
+    for i in range(K):
+        if (GthLen - Olen) % 2 != 0:
+            PaddingNew[i][:, PadNum: -(PadNum+1)] = StkGather[i]
+        else:
+            PaddingNew[i][:, PadNum: -PadNum] = StkGather[i]
+    return PaddingNew
+
+
 # -------- pytorch dataset iterator --------------------------------
 """
 Load Data: 
@@ -218,15 +231,7 @@ class DLSpec(data.Dataset):
         if LoadStk:  # loading stk data
             # padding the gather
             if DataDict['stkG'].shape[-1] < self.GatherLen:
-                K, H, Olen = DataDict['stkG'].shape
-                PaddingNew = np.zeros((K, H, self.GatherLen), dtype=np.float32)
-                PadNum = int((self.GatherLen - Olen)/2)
-                for i in range(DataDict['stkG'].shape[0]):
-                    if (self.GatherLen - Olen) % 2 != 0:
-                        PaddingNew[i][:, PadNum: -(PadNum+1)] = DataDict['stkG'][i]
-                    else:
-                        PaddingNew[i][:, PadNum: -PadNum] = DataDict['stkG'][i]
-                DataDict['stkG'] = PaddingNew
+                DataDict['stkG'] = STKPadding(DataDict['stkG'], self.GatherLen)
             stkG, stkC = DataDict['stkG'], DataDict['stkC']
         else:
             stkG, stkC = 0, 0
@@ -241,3 +246,18 @@ class DLSpec(data.Dataset):
 
     def __len__(self):
         return len(self.index)
+
+
+def PredictSingleLoad(DataDict, t0Ind, resize, GatherLen):
+    VMM = np.array([DataDict['vInt'][0], DataDict['vInt'][-1]])[np.newaxis, ...]
+    # make mask
+    mask, ManualCurve = make_label_main(DataDict['label'], DataDict['spectrum'], t0Ind, DataDict['vInt'], 'soft')
+    mask = scale_img(mask, resize_n=resize).squeeze()
+
+    # padding the gather
+    if DataDict['stkG'].shape[-1] < GatherLen:
+        DataDict['stkG'] = STKPadding(DataDict['stkG'], GatherLen)
+    stkG, stkC = DataDict['stkG'], DataDict['stkC']
+    FM = generate_feature_map(DataDict['spectrum'], resize)[np.newaxis, ...]
+    stkG, stkC = torch.tensor(stkG[np.newaxis, ...]), torch.tensor(stkC[np.newaxis, ...])
+    return FM, stkG, stkC, mask, VMM, ManualCurve

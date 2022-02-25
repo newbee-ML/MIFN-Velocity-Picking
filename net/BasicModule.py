@@ -175,9 +175,9 @@ class STKEncoder(nn.Module):
         :return: Stk Data Encode                          | shape = BS * 1 * H * W
         """
         gatherNew = gather.view((-1, 1, gather.shape[-2], gather.shape[-1]))
-        GEnR = self.GEncoder(gatherNew).view((gather.shape[0], gather.shape[1], -1, 1))
         with torch.no_grad():
             CVMask = self.CVEncoder(cv, VMM)
+        GEnR = self.GEncoder(gatherNew).view((gather.shape[0], gather.shape[1], -1, 1))
         Multiply = torch.mul(GEnR, CVMask)
         MaxFeature = torch.sum(Multiply, dim=1).unsqueeze(1)
         MixX = self.CBL(MaxFeature)

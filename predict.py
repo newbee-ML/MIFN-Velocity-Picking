@@ -111,8 +111,7 @@ def predict():
             for n in name:
                 PwrIndex = np.array(H5Dict['pwr'][n]['SpecIndex'])
                 RawPwr.append(np.array(SegyDict['pwr'].trace.raw[PwrIndex[0]: PwrIndex[1]].T))
-                VInt.append(np.array(SegyDict['pwr'].attributes(segyio.TraceField.offset)
-                                     [PwrIndex[0]: PwrIndex[1]]))
+                VInt.append(np.array(SegyDict['pwr'].attributes(segyio.TraceField.offset)[PwrIndex[0]: PwrIndex[1]]))
                 NameList.append(n.split('_'))
 
             # get velocity Picking
