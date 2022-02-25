@@ -1,11 +1,12 @@
-import matplotlib.pyplot as plt
-from torchvision import transforms
-import numpy as np
 import copy
 import os
-import seaborn as sns
-import cv2
 
+import cv2
+import matplotlib.pyplot as plt
+import numpy as np
+import seaborn as sns
+from PIL import Image
+from torchvision import transforms
 
 """
 A few functions to Plot results
@@ -84,7 +85,7 @@ def plot_cmp(cmp_data, t_vec, o_vec, save_path='xxx', if_add=1):
 
 
 # Plot spectrum
-def plot_spectrum(spectrum, t0_vec, v_vec, save_path='xxx', VelCurve=None):
+def plot_spectrum(spectrum, t0_vec, v_vec, save_path=None, VelCurve=None):
     if len(t0_vec) != spectrum.shape[0]:
         t0_vec = np.linspace(t0_vec[0], t0_vec[-1], spectrum.shape[0])
     if len(v_vec) != spectrum.shape[1]:
@@ -106,12 +107,15 @@ def plot_spectrum(spectrum, t0_vec, v_vec, save_path='xxx', VelCurve=None):
     plt.xlabel('Velocity (m/s)')
     set_axis(v_vec, t0_vec)
     plt.ylabel('Time (ms)')
-    plt.savefig(save_path, dpi=100, bbox_inches='tight')
+    if save_path is None:
+        plt.show()
+    else:
+        plt.savefig(save_path, dpi=100, bbox_inches='tight')
     plt.close('all')
 
 
 # plot original spectrum
-def OriSpec(spectrum, save_path='xxx'):
+def OriSpec(spectrum, save_path=None):
     origin_pwr = 255 - (spectrum - np.min(spectrum)) / (np.max(spectrum) - np.min(spectrum)) * 255
     data_plot = origin_pwr.astype(np.uint8).squeeze()
     data_plot_hot = cv2.applyColorMap(data_plot, cv2.COLORMAP_JET)  # COLORMAP_JET COLORMAP_HOT
@@ -422,3 +426,21 @@ def EnhancedProcess(ProcessDict, SavePath):
         plt.axis('off')
         plt.savefig(SavePath.replace('.png', '_S%d.png' % int(name)), dpi=300, bbox_inches='tight')
         plt.close('all')
+
+
+# plot the feature map
+def FeatureMap(array, SavePath=None, cmap='Hot'):
+    ScaledArray = (array - np.min(array)) / (np.max(array) - np.min(array)) * 255
+    ScaledArray = ScaledArray.astype(np.uint8).squeeze()
+    plt.figure(figsize=(1, 2), dpi=300)
+    if cmap == 'Hot':
+        plt.imshow(ScaledArray, cmap='seismic', aspect='auto')
+    else:
+        print(ScaledArray.shape)
+        plt.imshow(ScaledArray, cmap='gray', aspect='auto')
+    plt.axis('off')
+    if SavePath is None:
+        plt.show()
+    else:
+        plt.savefig(SavePath, dpi=150, bbox_inches='tight')
+    plt.close('all')

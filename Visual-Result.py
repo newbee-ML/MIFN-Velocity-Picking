@@ -1,4 +1,6 @@
-####################### Import Settings #####################
+##########################
+# Import Settings 
+##########################
 import argparse
 import os
 import warnings
@@ -14,10 +16,13 @@ from sklearn.model_selection import train_test_split
 from utils.evaluate import GetResult
 from net.MIFNet import MultiInfoNet
 from utils.LoadData import LoadSingleData, PredictSingleLoad
+from utils.PlotTools import *
 
 warnings.filterwarnings("ignore")
 
-############### Base Setting ###############################
+#######################
+# Base Setting
+#######################
 parser = argparse.ArgumentParser()
 parser.add_argument('--DataSet', type=str, default='hade', help='Dataset Root Path')
 parser.add_argument('--DataSetRoot', type=str, help='Dataset Root Path')
@@ -37,8 +42,11 @@ opt.DataSetRoot = 'E:\\Spectrum\\hade'
 opt.LoadModel = 'F:\\VSP-MIFN\\0Ablation\\hade\\model\\DS_hade-SR_0.80-LR_0.0010-BS_8-SH_256-PT_0.10-SGSM_mute.pth'
 opt.Predthre = 0.3
 opt.SeedRate = 0.5
+RootSave = os.path.join('F:/', 'VSP-MIFN', '1VisualResult')
 
-########## Show the test index ###################
+########################
+# Show the test index 
+########################
 # load segy data
 SegyName = {'pwr': 'vel.pwr.sgy',
             'stk': 'vel.stk.sgy',
@@ -72,7 +80,9 @@ trainIndex, _ = train_test_split(trainIndex, test_size=1-opt.SeedRate, random_st
 # Print test list
 print('Predict Number', len(testIndex), '\n', testIndex)
 
-############### Load Model ####################################
+########################
+# Load Model 
+########################
 # Load MIFN
 opt.t0Int = np.array(SegyDict['pwr'].samples)
 opt.Resize = [int(opt.SizeH), int(opt.SizeH/2)]
@@ -82,15 +92,16 @@ if use_gpu:
     net = net.cuda(opt.GPUNO)
 net.eval()
 # Load Model
-ModelParas = torch.load(opt.LoadModel)['Weights']
-net.load_state_dict(ModelParas)
+net.load_state_dict(torch.load(opt.LoadModel)['Weights'])
 
-############### Predict Single One #################################
+#######################
+# Predict Single One 
+#######################
 index = '2800_2040'
 # Load data
 DataDict = LoadSingleData(SegyDict, H5Dict, LabelDict, index, mode='train', LoadG=True)
+VInt = DataDict['vInt']
 FM, stkG, stkC, mask, VMM, ManualCurve = PredictSingleLoad(DataDict, opt.t0Int, opt.Resize, opt.GatherLen)
-print(list(DataDict.keys()))
 if use_gpu:
     pwr = FM.cuda(opt.GPUNO)
     stkG = stkG.cuda(opt.GPUNO)
@@ -98,3 +109,11 @@ if use_gpu:
 
 out, STKInfo = net(pwr, stkG, stkC, VMM)
 PredSeg, STKInfo = out.squeeze(), STKInfo.squeeze()
+print('the shape of output probability map is', list(PredSeg.shape))
+
+# plot original spectrum
+FeatureMap(FM[:, 0, ...].cpu().detach().numpy(), SavePath=os.path.join(RootSave, '%s-OriginPwr' % index))
+# plot prediction
+FeatureMap(PredSeg.cpu().detach().numpy(), SavePath=os.path.join(RootSave, '%s-SegMap' % index))
+# plot stk gather
+FeatureMap(stkG[:, 1, ...].cpu().detach().numpy(), cmap='Gray', SavePath=os.path.join(RootSave, '%s-StkGather' % index))
