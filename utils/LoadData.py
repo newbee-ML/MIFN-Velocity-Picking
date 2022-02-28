@@ -124,8 +124,7 @@ def LoadSingleData(SegyDict, H5Dict, LabelDict, index, mode='train', LoadG=True)
     line, cdp = index.split('_')
 
     DataDict.setdefault('spectrum', np.array(SegyDict['pwr'].trace.raw[PwrIndex[0]: PwrIndex[1]].T))
-    DataDict.setdefault('vInt', np.array(SegyDict['pwr'].attributes(segyio.TraceField.offset)
-                                         [PwrIndex[0]: PwrIndex[1]]))
+    DataDict.setdefault('vInt', np.array(SegyDict['pwr'].attributes(segyio.TraceField.offset)[PwrIndex[0]: PwrIndex[1]]))
     if LoadG:
         StkData = np.array(SegyDict['stk'].trace.raw[StkIndex[0]: StkIndex[1]].T)
         gather, cv = SplitGatherCV(StkData)

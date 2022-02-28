@@ -69,3 +69,25 @@ def GetSingleCurve(seg_mat, t_ind, t0_ind, v_ind, threshold=0.1, k=0):
     auto_curve = interpolation(auto_peaks, t_ind, v_ind)
 
     return auto_curve, auto_peaks
+
+
+# ---------- NMO Correction ------------
+# Calculate travel time
+def TravelTime(t0, x, vNMO):
+    return np.sqrt(t0 ** 2 + (x / vNMO * 1000) ** 2)
+
+
+# main function 
+def NMOCorr(CMPGather, tVec, OffsetVec, VNMO, CutC=1.2):
+    nmo = np.zeros_like(CMPGather)
+    tMin, dt = tVec[0], tVec[1] - tVec[0]
+    for j, x in enumerate(OffsetVec):
+        TravelT = TravelTime(tVec, x, VNMO)
+        ChangeS = TravelT / (tVec + 1)
+        # invert to the t0 index
+        t0Index = ((TravelT - tMin) / dt).astype(np.int32)
+        RevertIndex = np.where(t0Index < len(tVec))[0]
+        SaveIndex = np.where(ChangeS < CutC)[0]
+        SaveIndex = list(set(SaveIndex) & set(RevertIndex))
+        nmo[SaveIndex, j] = CMPGather[t0Index[SaveIndex], j]
+    return nmo

@@ -54,7 +54,7 @@ def train():
     TBPath = os.path.join(opt.OutputPath, BaseName, 'TBLog')
     writer = SummaryWriter(TBPath)
     BestPath = os.path.join(opt.OutputPath, BaseName, 'model', 'Best.pth')
-    LogPath = os.path.join(opt.OutputPath, BaseName, 'log', 'Train.log')
+    LogPath = os.path.join(opt.OutputPath, BaseName, 'log')
     setup_logger(LogPath)
     logger = logging.getLogger()
     logger.info('Training --- %s' % BaseName)

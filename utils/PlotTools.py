@@ -444,3 +444,78 @@ def FeatureMap(array, SavePath=None, cmap='Hot'):
     else:
         plt.savefig(SavePath, dpi=150, bbox_inches='tight')
     plt.close('all')
+
+###################################
+# Plot for test Part
+###################################
+
+# 1 hist for VMAE
+def VMAEHist(VMAEList, SavePath=None):
+    plt.figure(figsize=(5, 5), dpi=100)
+    plt.hist(VMAEList)
+    if SavePath is None:
+        plt.show()
+    else:
+        plt.savefig(SavePath, dpi=100, bbox_inches='tight')
+    plt.close('all')
+
+
+# 2.1 Pwr and Seg Map
+def PwrASeg(Pwr, Seg, SavePath=None):
+    _, axs = plt.subplots(1, 2)
+    # scale data mat
+    ScaledPwr = (Pwr - np.min(Pwr)) / (np.max(Pwr) - np.min(Pwr)) * 255
+    ScaledPwr = ScaledPwr.astype(np.uint8).squeeze()
+    ScaledSeg = (Seg - np.min(Seg)) / (np.max(Seg) - np.min(Seg)) * 255
+    ScaledSeg = ScaledSeg.astype(np.uint8).squeeze()
+    axs[0].imshow(ScaledPwr, cmap='seismic', aspect='auto')
+    axs[1].imshow(ScaledSeg, cmap='gray', aspect='auto')
+    plt.axis('off')
+    if SavePath is None:
+        plt.show()
+    else:
+        plt.savefig(SavePath, dpi=100, bbox_inches='tight')
+    plt.close('all')
+
+
+# 2.2 Seg with AP and MP 
+def SegPick(Seg, t0Vec, vVec, AP, MP, SavePath=None):
+    Seg = cv2.resize(np.squeeze(Seg), (len(vVec), len(t0Vec)))
+    ScaledSeg = (Seg - np.min(Seg)) / (np.max(Seg) - np.min(Seg)) * 255
+    ScaledSeg = ScaledSeg.astype(np.uint8).squeeze()
+    plt.figure(figsize=(2, 10), dpi=150)
+    label = ['Auto Velocity', 'Manual Velocity']
+    col = ['r', 'darkorange']
+    for ind, VelC in enumerate([AP, MP]):
+        VCCP = copy.deepcopy(VelC)
+        VCCP[:, 0] = (VCCP[:, 0]-t0Vec[0]) / (t0Vec[1]-t0Vec[0])
+        VCCP[:, 1] = (VCCP[:, 1]-vVec[0]) / (vVec[1]-vVec[0])
+        plot_curve(VCCP, col[ind], label[ind])   
+    plt.legend()
+    plt.imshow(ScaledSeg, aspect='auto', cmap='gray')
+    plt.xlabel('Velocity (m/s)')
+    set_axis(vVec, t0Vec)
+    plt.ylabel('Time (ms)')
+    if SavePath is None:
+        plt.show()
+    else:
+        plt.savefig(SavePath, dpi=100, bbox_inches='tight')
+    plt.close('all')
+
+
+# 2.3 CMP gather and NMO result
+def CMPNMO(Gth, NMOGth, SavePath=None):
+    _, axs = plt.subplots(1, 2)
+    # scale data mat
+    ScaledGth = (Gth - np.min(Gth)) / (np.max(Gth) - np.min(Gth)) * 255
+    ScaledGth = ScaledGth.astype(np.uint8).squeeze()
+    ScaledNMO = (NMOGth - np.min(NMOGth)) / (np.max(NMOGth) - np.min(NMOGth)) * 255
+    ScaledNMO = ScaledNMO.astype(np.uint8).squeeze()
+    axs[0].imshow(ScaledGth, cmap='seismic', aspect='auto')
+    axs[1].imshow(ScaledNMO, cmap='seismic', aspect='auto')
+    plt.axis('off')
+    if SavePath is None:
+        plt.show()
+    else:
+        plt.savefig(SavePath, dpi=100, bbox_inches='tight')
+    plt.close('all')

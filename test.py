@@ -17,6 +17,8 @@ from tqdm import tqdm
 from net.MIFNet import MultiInfoNet
 from utils.evaluate import GetResult
 from utils.LoadData import DLSpec
+from utils.PlotTools import *
+from utils.PastProcess import NMOCorr, interpolation
 
 warnings.filterwarnings("ignore")
 
@@ -104,7 +106,7 @@ def test():
 
     # predict all of the dataset
     with torch.no_grad():
-        for pwr, stkG, stkC, mask, VMM, MP, name in dlPred:
+        for pwr, stkG, stkC, _, VMM, MP, name in dlPred:
             if use_gpu:
                 pwr = pwr.cuda(opt.GPUNO)
                 stkG = stkG.cuda(opt.GPUNO)
@@ -134,14 +136,30 @@ def test():
     for name, ResultDict in PickDict.items():
         vmae = np.mean(np.abs(ResultDict['AP'][:, 1] - ResultDict['MP'][:, 1]))
         PickDict[name].setdefault('VMAE', vmae)
-        print(name, '%.3f' % vmae)
     # Save result
-    np.save(os.path.join(opt.OutputPath, 'PickDict.npy'), PickDict)
+    np.save(os.path.join(opt.OutputPath, '0-PickDict.npy'), PickDict)
 
-    # visual result
-    for name, ResultDict in PickDict.items():
-        pass
-    
+    ## visual result
+    # 1 hist of VMAE results
+    VMAEList = [RDict['VMAE'] for RDict in PickDict.values()]
+    VMAEHist(VMAEList, SavePath=os.path.join(opt.OutputPath, '1-VMAEHist'))
+
+    # 2 Visual Part Bad Results
+    for name in VisualSample:
+        ResultDict = PickDict[name]
+        # 2.1 Pwr and Seg Map
+        PwrASeg(ResultDict['Pwr'], ResultDict['Seg'], SavePath=os.path.join(opt.OutputPath, '2-1-PwrASeg %s' % name))
+        # 2.2 Seg with AP and MP 
+        PwrIndex = np.array(H5Dict['pwr'][name]['SpecIndex'])
+        vVec = np.array(SegyDict['pwr'].attributes(segyio.TraceField.offset)[PwrIndex[0]: PwrIndex[1]])
+        SegPick(ResultDict['Seg'], opt.t0Int, vVec, ResultDict['AP'], ResultDict['MP'], SavePath=os.path.join(opt.OutputPath, '2-2-SegPick %s' % name))
+        # 2.3 CMP gather and NMO result
+        GthIndex = np.array(H5Dict['gth'][name]['GatherIndex'])
+        Gth = np.array(SegyDict['gth'].trace.raw[GthIndex[0]: GthIndex[1]].T)
+        OVec = np.array(SegyDict['gth'].attributes(segyio.TraceField.offset)[GthIndex[0]: GthIndex[1]])
+        AP = interpolation(ResultDict['AP'], np.array(SegyDict['gth'].samples), vVec)
+        NMOGth = NMOCorr(Gth, np.array(SegyDict['gth'].samples), OVec, AP[:, 1], CutC=1.2)
+        CMPNMO(Gth, NMOGth, SavePath=os.path.join(opt.OutputPath, '2-3-CMPNMO %s' % name))
 
 
 if __name__ == '__main__':
