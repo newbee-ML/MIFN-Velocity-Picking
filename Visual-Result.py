@@ -1,3 +1,12 @@
+"""
+This python file is for single prediction
+Visual the following plots:
+- original spectrum
+- segmentation map
+- SGS gather input map
+"""
+
+
 ##########################
 # Import Settings 
 ##########################
