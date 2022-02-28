@@ -28,35 +28,33 @@ warnings.filterwarnings("ignore")
 
 def CheckSavePath(BaseName):
     basicFile = ['log', 'model', 'TBLog']
-    for ind, file in enumerate(basicFile):
-        if ind == 2:
-            Path = os.path.join(opt.OutputPath, file, BaseName)
-        else:
-            Path = os.path.join(opt.OutputPath, opt.DataSet, file, BaseName)
-        if opt.ReTrain:
-            if os.path.exists(Path):
-                shutil.rmtree(Path)
-        if not os.path.exists(Path):
-            os.makedirs(Path)
+    SavePath = os.path.join(opt.OutputPath, BaseName)
+    if opt.ReTrain:
+        if os.path.exists(SavePath):
+            shutil.rmtree(SavePath)
+        if not os.path.exists(SavePath):
+            for file in basicFile:
+                Path = os.path.join(SavePath, file)
+                os.makedirs(Path)
+    else:
+        return 0
+    
+        
 
 
 def train():
     print('==== Begin to train ====')
     # BaseName
-    BaseName = 'DS_%s-SR_%.2f-LR_%.4f-BS_%d-SH_%d-PT_%.2f-SGSM_%s' % (opt.DataSet, opt.SeedRate, opt.lrStart, opt.trainBS, opt.SizeH, opt.Predthre, opt.SGSMode)
+    BaseName = 'DS_%s-SGSL_%d-SR_%.2f-LR_%.4f-BS_%d-SH_%d-SW_%d-PT_%.2f-SGSM_%s-RT_%d' % (opt.DataSet, opt.GatherLen, opt.SeedRate, opt.lrStart, opt.trainBS, opt.SizeH, opt.SizeH, opt.Predthre, opt.SGSMode, opt.RepeatTime)
+
     # check output folder and check path
-    opt.Resize = [int(opt.SizeH), int(opt.SizeH/2)]
-    TBPath = os.path.join(opt.OutputPath, 'TBLog', BaseName)
     CheckSavePath(BaseName)
-
-    opt.OutputPath = os.path.join(opt.OutputPath, opt.DataSet)
-    OutputPath = opt.OutputPath
-    BestPath = os.path.join(OutputPath, 'model', '%s.pth' % BaseName)
-
-    # setup the logger
-    LogPath = os.path.join(OutputPath, 'log', BaseName)
-    setup_logger(LogPath)
+    opt.Resize = [int(opt.SizeH), int(opt.SizeW)]
+    TBPath = os.path.join(opt.OutputPath, BaseName, 'TBLog')
     writer = SummaryWriter(TBPath)
+    BestPath = os.path.join(opt.OutputPath, BaseName, 'model', 'Best.pth')
+    LogPath = os.path.join(opt.OutputPath, BaseName, 'log', 'Train.log')
+    setup_logger(LogPath)
     logger = logging.getLogger()
     logger.info('Training --- %s' % BaseName)
 
@@ -67,6 +65,7 @@ def train():
     SegyDict = {}
     for name, path in SegyName.items():
         SegyDict.setdefault(name, segyio.open(os.path.join(opt.DataSetRoot, 'segy', path), "r", strict=False))
+
     # load h5 file
     H5Name = {'pwr': 'SpecInfo.h5',
               'stk': 'StkInfo.h5',
@@ -131,8 +130,8 @@ def train():
             raise "There is no such model file, start a new training!"
     else:
         countIter, epoch, lrStart, bestVloss = 0, 1, opt.lrStart, 1e10
-
     criterion = nn.BCELoss()
+
     # define the optimizer
     optimizer = torch.optim.Adam(net.parameters(), lr=lrStart)
 
@@ -231,8 +230,7 @@ def train():
                 if os.path.exists(BestPath):
                     net.load_state_dict(torch.load(BestPath)['Weights'])
             try:
-                logger.info('it: %d/%d, epoch: %d, Loss: %.6f, VMAE: %.6f, BestLoss: %.6f' %
-                            (countIter, opt.MaxIter, epoch, LossValid, VMAEValid, bestVloss))
+                logger.info('it: %d/%d, epoch: %d, Loss: %.6f, VMAE: %.6f, BestLoss: %.6f' % (countIter, opt.MaxIter, epoch, LossValid, VMAEValid, bestVloss))
             except TypeError:
                 logger.info('it: %d/%d, epoch: %d, TypeError')
                 
@@ -246,11 +244,13 @@ if __name__ == '__main__':
     parser.add_argument('--OutputPath', type=str, default='result', help='Path of Output')
     parser.add_argument('--SGSMode', type=str, default='all')
     parser.add_argument('--GatherLen', type=int, default=21)
+    parser.add_argument('--RepeatTime', type=int, default=0)
     parser.add_argument('--SeedRate', type=float, default=0.5)
     parser.add_argument('--ReTrain', type=int, default=1)
     parser.add_argument('--GPUNO', type=int, default=0)
     parser.add_argument('--Resize', type=list, help='Reset Image Size')
     parser.add_argument('--SizeH', type=int, default=256, help='Size Height')
+    parser.add_argument('--SizeW', type=int, default=256, help='Size Width')
     parser.add_argument('--Predthre', type=float, default=0.3)
     parser.add_argument('--MaxIter', type=int, default=15000, help='max iteration')
     parser.add_argument('--SaveIter', type=int, default=100, help='checkpoint each SaveIter')
