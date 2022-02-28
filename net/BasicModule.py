@@ -39,17 +39,17 @@ class CBR(nn.Module):
 class SPP(nn.Module):
     def __init__(self):
         super(SPP, self).__init__()
-        self.CBL1 = CBL(1, 1)
-        self.CBL2 = CBL(3, 2)
-        self.CBL3 = CBL(2, 1)
-        self.Pool1 = nn.MaxPool2d(kernel_size=3,stride=1, padding=3 // 2)
+        self.CBL1 = CBL(1, 1, K=(3, 3), S=(3, 2))
+        self.CBL2 = CBL(3, 2, K=(3, 3), S=(3, 2))
+        self.CBL3 = CBL(2, 1, K=(3, 2), S=(3, 2))
+        self.Pool1 = nn.MaxPool2d(kernel_size=3, stride=1, padding=3 // 2)
         self.Pool2 = nn.MaxPool2d(kernel_size=5, stride=1, padding=5 // 2)
  
     def forward(self, x):
         x = self.CBL1(x)
         xP1 = self.Pool1(x)
         xP2 = self.Pool2(x)
-        xCat = torch.cat([x, xP1, xP2],dim=1)
+        xCat = torch.cat([x, xP1, xP2], dim=1)
         xCat = self.CBL2(xCat)
         x = self.CBL3(xCat)
         return x

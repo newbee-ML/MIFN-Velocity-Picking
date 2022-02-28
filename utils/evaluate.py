@@ -14,7 +14,7 @@ def GetResult(SegMat, t0Ind, vInd, threshold=0.1):
     VelCurve = []
     VelPick = []
 
-    # resize the pred
+    # resize the prediction
     PredNew = []
     for i in range(SegMat.shape[0]):
         PredNew.append(resize_spectrum(SegMat[i].float(), (len(t0Ind), len(vInd[i]))))

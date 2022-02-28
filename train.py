@@ -7,6 +7,7 @@ import copy
 import segyio
 import time
 import os
+import random
 import shutil
 import warnings
 import datetime
@@ -86,17 +87,18 @@ def train():
 
     # find common index
     Index = sorted(list((pwr_index & stk_index) & (gth_index & set(HaveLabelIndex))))
-    trainIndex, testIndex = train_test_split(Index, test_size=0.2, random_state=123)
-    trainIndex, _ = train_test_split(trainIndex, test_size=1-opt.SeedRate, random_state=123)
-    print('Train Num %d, Valid Num %d' % (len(trainIndex), len(testIndex)))
+    trainIndex, _ = train_test_split(Index, test_size=0.2, random_state=123)
+    trainIndex, validIndex = train_test_split(trainIndex, test_size=1-opt.SeedRate, random_state=123)
+    random.seed(123)
+    VisualSample = random.sample(trainIndex, 16)
+    print('Train Num %d, Valid Num %d' % (len(trainIndex), len(validIndex)))
 
-    # load t0 ind and v ind
-    T0Ind = np.array(SegyDict['pwr'].samples)
-    opt.t0Int = T0Ind
+    # load t0 ind
+    opt.t0Int = np.array(SegyDict['pwr'].samples)
 
     # build data loader
-    ds = DLSpec(SegyDict, H5Dict, LabelDict, trainIndex, T0Ind, resize=opt.Resize, GatherLen=opt.GatherLen)
-    dsval = DLSpec(SegyDict, H5Dict, LabelDict, testIndex, T0Ind, resize=opt.Resize, GatherLen=opt.GatherLen)
+    ds = DLSpec(SegyDict, H5Dict, LabelDict, trainIndex, opt.t0Int, resize=opt.Resize, GatherLen=opt.GatherLen)
+    dsval = DLSpec(SegyDict, H5Dict, LabelDict, validIndex, opt.t0Int, resize=opt.Resize, GatherLen=opt.GatherLen)
     dl = DataLoader(ds,
                     batch_size=opt.trainBS,
                     shuffle=True,
@@ -113,7 +115,7 @@ def train():
     use_gpu = torch.cuda.device_count() > 0
 
     # load network
-    net = MultiInfoNet(T0Ind, opt, in_channels=11, resize=opt.Resize, mode=opt.SGSMode)
+    net = MultiInfoNet(opt.t0Int, opt, in_channels=11, resize=opt.Resize, mode=opt.SGSMode)
     if use_gpu:
         net = net.cuda(opt.GPUNO)
     net.train()
@@ -138,7 +140,7 @@ def train():
     # define the lr_scheduler of the optimizer
     scheduler = MultiStepLR(optimizer, [10, 30, 100], 0.1)
     
-    """ ==== Start to Train ==== """
+    ####### Start to Train ############
     # initialize
     loss_avg = []
     st = glob_st = time.time()
@@ -164,7 +166,7 @@ def train():
             stkC = stkC.cuda(opt.GPUNO)
 
         optimizer.zero_grad()
-        out, _ = net(pwr, stkG, stkC, VMM)
+        out, StkFeat = net(pwr, stkG, stkC, VMM)
 
         # compute loss
         loss = criterion(out.squeeze(), label)
@@ -175,6 +177,11 @@ def train():
         loss_avg.append(loss.item())
         writer.add_scalar('Train-Loss', loss.item(), global_step=countIter)
         writer.add_scalar('Train-Lr', optimizer.param_groups[0]['lr'], global_step=countIter)
+        for ind, name_ind in enumerate(name):
+            if name_ind in VisualSample:
+                writer.add_image('SegProbMap-%s' % name_ind, out[ind].squeeze(), global_step=epoch, dataformats='HW')
+                writer.add_image('StkFeat-%s' % name_ind, StkFeat[ind].squeeze(), global_step=epoch, dataformats='HW')
+        # print the log per opt.MsgIter
         if countIter % opt.MsgIter == 0:
             loss_avg = sum(loss_avg) / len(loss_avg)
             lr = optimizer.param_groups[0]['lr']
@@ -207,7 +214,6 @@ def train():
         # check points
         if countIter % opt.SaveIter == 0:  
             net.eval()
-
             # evaluator
             with torch.no_grad():
                 LossValid, VMAEValid = EvaluateValid(net, dlval, criterion, opt,
@@ -233,31 +239,30 @@ def train():
                 logger.info('it: %d/%d, epoch: %d, Loss: %.6f, VMAE: %.6f, BestLoss: %.6f' % (countIter, opt.MaxIter, epoch, LossValid, VMAEValid, bestVloss))
             except TypeError:
                 logger.info('it: %d/%d, epoch: %d, TypeError')
-                
             net.train()
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--DataSetRoot', type=str, help='Dataset Root Path')
-    parser.add_argument('--DataSet', type=str, default='hade1', help='Dataset Root Path')
-    parser.add_argument('--OutputPath', type=str, default='result', help='Path of Output')
-    parser.add_argument('--SGSMode', type=str, default='all')
-    parser.add_argument('--GatherLen', type=int, default=21)
+    parser.add_argument('--DataSetRoot', type=str, default='E:\\Spectrum\\hade',  help='Dataset Root Path')
+    parser.add_argument('--DataSet', type=str, default='hade', help='Dataset Root Path')
+    parser.add_argument('--OutputPath', type=str, default='F:\\VSP-MIFN\\0Ablation', help='Path of Output')
+    parser.add_argument('--SGSMode', type=str, default='mute')
+    parser.add_argument('--GatherLen', type=int, default=11)
     parser.add_argument('--RepeatTime', type=int, default=0)
-    parser.add_argument('--SeedRate', type=float, default=0.5)
-    parser.add_argument('--ReTrain', type=int, default=1)
+    parser.add_argument('--SeedRate', type=float, default=0.8)
+    parser.add_argument('--ReTrain', type=int, default=0)
     parser.add_argument('--GPUNO', type=int, default=0)
     parser.add_argument('--Resize', type=list, help='Reset Image Size')
     parser.add_argument('--SizeH', type=int, default=256, help='Size Height')
     parser.add_argument('--SizeW', type=int, default=256, help='Size Width')
-    parser.add_argument('--Predthre', type=float, default=0.3)
-    parser.add_argument('--MaxIter', type=int, default=15000, help='max iteration')
+    parser.add_argument('--Predthre', type=float, default=0.1)
+    parser.add_argument('--MaxIter', type=int, default=10000, help='max iteration')
     parser.add_argument('--SaveIter', type=int, default=100, help='checkpoint each SaveIter')
     parser.add_argument('--MsgIter', type=int, default=20, help='log the loss each MsgIter')
-    parser.add_argument('--lrStart', type=float, default=0.01, help='the beginning learning rate')
+    parser.add_argument('--lrStart', type=float, default=0.001, help='the beginning learning rate')
     parser.add_argument('--LoadModel', type=str, help='Load Old to train (Path)')
-    parser.add_argument('--trainBS', type=int, default=16, help='The batchsize of train')
+    parser.add_argument('--trainBS', type=int, default=8, help='The batchsize of train')
     parser.add_argument('--valBS', type=int, default=16, help='The batchsize of valid')
     parser.add_argument('--t0Int', type=list, default=[])
     parser.add_argument('--vInt', type=list, default=[])

@@ -29,7 +29,7 @@ def scale_change(x, y, x_ind, y_ind, method):
 
 # ---------- Pick the trend peaks ------------
 # get the velocity curve from the segmentation matrix
-def GetSingleCurve(seg_mat, t_ind, t0_ind, v_ind, threshold=0.5, SampleRate=0.3, k=0):
+def GetSingleCurve(seg_mat, t_ind, t0_ind, v_ind, threshold=0.1, k=0):
     # scale SegMat and find the index up threshold
     SegMat = copy.deepcopy(seg_mat).astype(np.float)
     SegMat = (SegMat-np.min(SegMat))/np.ptp(SegMat)
@@ -41,10 +41,18 @@ def GetSingleCurve(seg_mat, t_ind, t0_ind, v_ind, threshold=0.5, SampleRate=0.3,
         return np.array([]), np.array([])
     if len(SelectInd) < 10:
         return GetSingleCurve(seg_mat, t_ind, t0_ind, v_ind, threshold/2, k=k+1)
-    SelectInd = random.sample(list(SelectInd), int(len(SelectInd)*SampleRate))
     SelectInd = np.array(sorted(SelectInd))
     SelectSeg = SegMat[SelectInd, :]
-    SelectVel = np.argmax(SelectSeg, axis=1)
+    # find the maximum of each row
+    MaxValue = np.max(SelectSeg, axis=1)
+    SelectVel = []
+    for ind, max_val in enumerate(MaxValue):
+        MaxIndex = np.where(SelectSeg[ind, :]==max_val)[0]
+        if len(MaxIndex) > 1:
+            SelectVel.append(int(np.mean(MaxIndex)))
+        else:
+            SelectVel.append(int(MaxIndex))
+    SelectVel = np.array(SelectVel)
     trend_peaks = np.hstack((SelectInd.reshape(-1, 1), SelectVel.reshape(-1, 1)))
         
     if np.nan in seg_mat:

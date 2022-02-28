@@ -222,8 +222,7 @@ class DLSpec(data.Dataset):
 
         # make mask
         if 'label' in DataDict.keys():
-            mask, ManualCurve = make_label_main(DataDict['label'], DataDict['spectrum'], self.t0Ind,
-                                                DataDict['vInt'], self.label_type)
+            mask, ManualCurve = make_label_main(DataDict['label'], DataDict['spectrum'], self.t0Ind, DataDict['vInt'], self.label_type)
             mask = scale_img(mask, resize_n=self.resize).squeeze()
         else:
             mask, ManualCurve = 0, 0
