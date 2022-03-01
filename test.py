@@ -1,13 +1,12 @@
 import argparse
 import os
+import random
 import shutil
 import time
 import warnings
 
 import h5py
-import random
 import numpy as np
-import pandas as pd
 import segyio
 import torch
 from sklearn.model_selection import train_test_split
@@ -17,11 +16,10 @@ from tqdm import tqdm
 from net.MIFNet import MultiInfoNet
 from utils.evaluate import GetResult
 from utils.LoadData import DLSpec
-from utils.PlotTools import *
 from utils.PastProcess import NMOCorr, interpolation2
+from utils.PlotTools import *
 
 warnings.filterwarnings("ignore")
-
 
 
 def CheckSavePath(opt):
@@ -188,5 +186,5 @@ if __name__ == '__main__':
     parser.add_argument('--t0Int', type=list, default=[])
     opt = parser.parse_args()
 
-    # start to predict
+    # start to test
     test()

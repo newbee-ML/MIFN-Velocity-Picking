@@ -36,7 +36,7 @@ def EvaluateValid(net, DataLoader, criterion, opt, SegyDict, H5Dict, use_gpu=1):
             VInt.append(np.array(SegyDict['pwr'].attributes(segyio.TraceField.offset)
                                  [PwrIndex[0]: PwrIndex[1]]))
         # get velocity curve
-        AutoCurve, _ = GetResult(PredSeg, opt.t0Int, VInt, threshold=opt.Predthre)
+        AutoCurve, _ = GetResult(PredSeg.cpu().numpy(), opt.t0Int, VInt, threshold=opt.Predthre)
         LossAvg.append(loss.item())
         MC = MC.numpy()
         mVMAE, _ = VMAE(AutoCurve, MC)
