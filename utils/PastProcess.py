@@ -1,6 +1,6 @@
 import numpy as np
-from utils.LoadData import interpolation
-import random
+from scipy import interpolate
+from sklearn import linear_model
 import copy
 
 """
@@ -26,21 +26,35 @@ def scale_change(x, y, x_ind, y_ind, method):
     else:
         print('error type input!')
 
+def GetResult(SegMat, t0Ind, vInd, threshold=0.1):
+    # 1 get the high probability points 
+    Peaks = np.array([GetHighProb(SegMap, threshold) for SegMap in SegMat])
 
-# ---------- Pick the trend peaks ------------
-# get the velocity curve from the segmentation matrix
-def GetSingleCurve(seg_mat, t_ind, t0_ind, v_ind, threshold=0.1, k=0):
-    # scale SegMat and find the index up threshold
-    SegMat = copy.deepcopy(seg_mat).astype(np.float)
+    # 2 transfer the scale
+    ScaledPeaks = []  
+    for ind, Peak in enumerate(Peaks):
+        _, H, W = SegMat.shape
+        t0IndN, vIndN = np.linspace(t0Ind[0], t0Ind[-1], H), np.linspace(vInd[ind][0], vInd[ind][-1], W)
+        ScaledT, ScaledV = scale_change(Peak[:, 0], Peak[:, 1], t0IndN, vIndN, 'up')
+        ScaledPeaks.append(np.array([ScaledT, ScaledV]).T)
+    ScaledPeaks = np.array(ScaledPeaks)
+
+    # 3 remove the outliers
+    FinalPeaks = ScaledPeaks
+    # 4 interpolate & regression
+
+    Curve = np.array([interpolation2(FinalPeak, t0Ind, vInd[ind], RefRange=300) for ind, FinalPeak in enumerate(FinalPeaks)])
+
+    return Curve, FinalPeaks
+
+
+# get the points with high probability on the segmentation map
+def GetHighProb(SegMat, threshold=0.1):
+    # scale the seg map to [0, 1]
     SegMat = (SegMat-np.min(SegMat))/np.ptp(SegMat)
+    # save the points with high probability
     stack_energy = np.max(SegMat, axis=1)
-    # EnergyHist(stack_energy)  # plot the distribution
-
     SelectInd = np.where(stack_energy > threshold)[0]
-    if k > 10:
-        return np.array([]), np.array([])
-    if len(SelectInd) < 10:
-        return GetSingleCurve(seg_mat, t_ind, t0_ind, v_ind, threshold/2, k=k+1)
     SelectInd = np.array(sorted(SelectInd))
     SelectSeg = SegMat[SelectInd, :]
     # find the maximum of each row
@@ -49,26 +63,54 @@ def GetSingleCurve(seg_mat, t_ind, t0_ind, v_ind, threshold=0.1, k=0):
     for ind, max_val in enumerate(MaxValue):
         MaxIndex = np.where(SelectSeg[ind, :]==max_val)[0]
         if len(MaxIndex) > 1:
-            SelectVel.append(int(np.mean(MaxIndex)))
+            SelectVel.append(np.mean(MaxIndex))
         else:
-            SelectVel.append(int(MaxIndex))
+            SelectVel.append(MaxIndex.item())
     SelectVel = np.array(SelectVel)
-    trend_peaks = np.hstack((SelectInd.reshape(-1, 1), SelectVel.reshape(-1, 1)))
-        
-    if np.nan in seg_mat:
-        return np.array([]), np.array([])
+    Peaks = np.hstack((SelectInd.reshape(-1, 1), SelectVel.reshape(-1, 1)))
+    return Peaks
 
-    if len(trend_peaks) < 10:
-        return GetSingleCurve(seg_mat, t_ind, t0_ind, v_ind, threshold/2)
 
-    # scale the t-v points to original scale
-    t_real, v_real = scale_change(trend_peaks[:, 0], trend_peaks[:, 1], t0_ind, v_ind, 'up')
-    auto_peaks = np.array((t_real, v_real)).T
+def interpolation2(LabelPoints, tVec, vVec=None, RefRange=300):
+    # sort the label points
+    LabelPoints = np.array(sorted(LabelPoints, key=lambda t_v: t_v[0]))
 
-    # interpolate the peaks to velocity curve
-    auto_curve = interpolation(auto_peaks, t_ind, v_ind)
+    # clip the tVec
+    LabelTmin, LabelTmax = np.min(LabelPoints[:, 0]), np.max(LabelPoints[:, 0])
+    UpIndex, DownIndex = np.where(tVec <= LabelTmin)[0], np.where(tVec >= LabelTmax)[0]
+    MedianIndex = sorted(list((set(np.arange(len(tVec))) - set(UpIndex)) - set(DownIndex)))
 
-    return auto_curve, auto_peaks
+    # ensure the input is int
+    tVec = np.array(tVec).astype(int)
+    tVecUp, tVecDown, tVecMed = tVec[UpIndex], tVec[DownIndex], tVec[MedianIndex]
+
+    # get the ground truth curve using interpolation
+    PeakSelected = np.array(LabelPoints)
+    func = interpolate.interp1d(PeakSelected[:, 0], PeakSelected[:, 1], kind='linear')
+    vMed = func(tVecMed)
+
+    # up part
+    UpRefPoints = LabelPoints[LabelPoints[:, 0] < LabelPoints[0, 0] + RefRange, :]
+    modelUp = linear_model.LinearRegression()
+    modelUp.fit(UpRefPoints[:, 0].reshape(-1, 1), UpRefPoints[:, 1]) 
+    modelUp.intercept_ = vMed[0] - modelUp.coef_.item()*tVecMed[0]
+    vUp = modelUp.predict(tVecUp.reshape(-1, 1))
+
+    # down part
+    DownRefPoints = LabelPoints[LabelPoints[:, 0] > LabelPoints[-1, 0] - RefRange, :]
+    modelDown = linear_model.LinearRegression()
+    modelDown.fit(DownRefPoints[:, 0].reshape(-1, 1), DownRefPoints[:, 1]) 
+    modelDown.intercept_ = vMed[-1] - modelDown.coef_.item()*tVecMed[-1]
+    vDown = modelDown.predict(tVecDown.reshape(-1, 1))
+    
+    vPred = np.concatenate((vUp, vMed, vDown))
+
+    
+    if vVec is not None:
+        vVec = np.array(vVec).astype(int) 
+        vPred = np.clip(vPred, vVec[0], vVec[-1])
+
+    return np.hstack((tVec.reshape(-1, 1), vPred.reshape(-1, 1)))
 
 
 # ---------- NMO Correction ------------

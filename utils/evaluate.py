@@ -1,7 +1,7 @@
 import segyio
 import os
 
-from utils.PastProcess import GetSingleCurve
+from utils.PastProcess import GetResult
 from utils.PlotTools import *
 from utils.metrics import VMAE
 import numpy as np
@@ -9,44 +9,6 @@ import numpy as np
 """
 Evaluate Processing for Network Training
 """
-
-def GetResult(SegMat, t0Ind, vInd, threshold=0.1):
-    VelCurve = []
-    VelPick = []
-
-    # resize the prediction
-    PredNew = []
-    for i in range(SegMat.shape[0]):
-        PredNew.append(resize_spectrum(SegMat[i].float(), (len(t0Ind), len(vInd[i]))))
-
-    # get the picking velocity curve
-    for i in range(len(PredNew)):
-        try:
-            VelCurveI, VelPickI = GetSingleCurve(PredNew[i], t0Ind, t0Ind, vInd[i], threshold=threshold)
-            VelCurve.append(VelCurveI)
-            VelPick.append(VelPickI)
-        except RecursionError:
-            VelCurve.append(np.array([]))
-            VelPick.append(np.array([]))
-
-    VelCurve = np.array(VelCurve)
-    return VelCurve, VelPick
-
-
-def GetPick(SegMat, RawPwr, t0Ind, vInd, threshold=0.1):
-    VelPick, PredNew = [], []
-
-    # resize the pred
-    for i in range(SegMat.shape[0]):
-        PredNew.append(resize_spectrum(SegMat[i].float(), (len(t0Ind), len(vInd[i]))))
-
-    # get the picking velocity curve
-    for i in range(len(PredNew)):
-        _, VelPickI = GetSingleCurve(PredNew[i], RawPwr[i], t0Ind, t0Ind, vInd[i], threshold=threshold)
-        VelPick.append(VelPickI)
-
-    VelPick = np.array(VelPick)
-    return VelPick
 
 
 def EvaluateValid(net, DataLoader, criterion, opt, SegyDict, H5Dict, use_gpu=1):

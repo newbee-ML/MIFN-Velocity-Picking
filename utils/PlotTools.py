@@ -478,6 +478,21 @@ def PwrASeg(Pwr, Seg, SavePath=None):
     plt.close('all')
 
 
+# 2.2.1 AP peaks and MP curve
+def InterpResult(APpeaks, MPcurve, SavePath=None):
+    _, ax = plt.subplots(figsize=(2, 10), dpi=90)
+    plt.scatter(APpeaks[:, 1], APpeaks[:, 0], c='r', s=0.3, marker='x', label='AP Peaks')
+    plt.plot(MPcurve[:, 1], MPcurve[:, 0], c='blue', linewidth=0.5, label='MP Curve')
+    plt.xlabel('Velocity (m/s)')
+    plt.ylabel('Time (ms)')
+    ax.invert_yaxis()
+    if SavePath is None:
+        plt.show()
+    else:
+        plt.savefig(SavePath, dpi=100, bbox_inches='tight')
+    plt.close('all')
+
+
 # 2.2 Seg with AP and MP 
 def SegPick(Seg, t0Vec, vVec, AP, MP, SavePath=None):
     Seg = cv2.resize(np.squeeze(Seg), (len(vVec), len(t0Vec)))

@@ -251,7 +251,7 @@ if __name__ == '__main__':
     parser.add_argument('--GatherLen', type=int, default=11)
     parser.add_argument('--RepeatTime', type=int, default=0)
     parser.add_argument('--SeedRate', type=float, default=0.8)
-    parser.add_argument('--ReTrain', type=int, default=0)
+    parser.add_argument('--ReTrain', type=int, default=1)
     parser.add_argument('--GPUNO', type=int, default=0)
     parser.add_argument('--Resize', type=list, help='Reset Image Size')
     parser.add_argument('--SizeH', type=int, default=256, help='Size Height')

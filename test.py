@@ -18,7 +18,7 @@ from net.MIFNet import MultiInfoNet
 from utils.evaluate import GetResult
 from utils.LoadData import DLSpec
 from utils.PlotTools import *
-from utils.PastProcess import NMOCorr, interpolation
+from utils.PastProcess import NMOCorr, interpolation2
 
 warnings.filterwarnings("ignore")
 
@@ -75,7 +75,7 @@ def test():
     Index = sorted(list((pwr_index & stk_index) & (gth_index & set(HaveLabelIndex))))
     _, testIndex = train_test_split(Index, test_size=0.2, random_state=123)
     random.seed(123)
-    VisualSample = random.sample(testIndex, 16)
+    # VisualSample = random.sample(testIndex, 16)
     
     # build DataLoader
     dsPred = DLSpec(SegyDict, H5Dict, LabelDict, testIndex, opt.t0Int,
@@ -86,47 +86,53 @@ def test():
                         num_workers=0,
                         drop_last=False)
 
-    # Load Predict Network
-    net = MultiInfoNet(opt.t0Int, opt, in_channels=11, resize=Resize)
-    if use_gpu:
-        net = net.cuda(opt.GPUNO)
-    net.eval()
-    # Load the weights of network
-    if os.path.exists(ModelPath):
-        print("Load Model Successfully! \n(%s)" % ModelPath)
-        net.load_state_dict(torch.load(ModelPath)['Weights'])
-    else:
-        print("There is no such model file, start a new training!")
-
-    # create dict to save auto picking results
-    PickDict = {}
-
     startP = time.time()  # start clock
-    bar = tqdm(total=len(dlPred))
 
-    # predict all of the dataset
-    with torch.no_grad():
-        for pwr, stkG, stkC, _, VMM, MP, name in dlPred:
-            if use_gpu:
-                pwr = pwr.cuda(opt.GPUNO)
-                stkG = stkG.cuda(opt.GPUNO)
-                stkC = stkC.cuda(opt.GPUNO)
+    # if have predicted then compute the VMAE result
+    if not os.path.exists(os.path.join(opt.OutputPath, '0-PickDict.npy')):
+        # Load Predict Network
+        net = MultiInfoNet(opt.t0Int, opt, in_channels=11, resize=Resize)
+        if use_gpu:
+            net = net.cuda(opt.GPUNO)
+        net.eval()
+        # Load the weights of network
+        if os.path.exists(ModelPath):
+            print("Load Model Successfully! \n(%s)" % ModelPath)
+            net.load_state_dict(torch.load(ModelPath)['Weights'])
+        else:
+            print("There is no such model file, start a new training!")
+        bar = tqdm(total=len(dlPred))
+        # create dict to save auto picking results
+        PickDict = {}   
+        # predict all of the dataset
+        with torch.no_grad():
+            for pwr, stkG, stkC, _, VMM, MP, name in dlPred:
+                if use_gpu:
+                    pwr = pwr.cuda(opt.GPUNO)
+                    stkG = stkG.cuda(opt.GPUNO)
+                    stkC = stkC.cuda(opt.GPUNO)
 
-            out, STKInfo = net(pwr, stkG, stkC, VMM)
-            PredSeg, STKInfo = out.squeeze(), STKInfo.squeeze()
-            RawPwr, VInt, NameList = [], [], []
-            for n in name:
-                PwrIndex = np.array(H5Dict['pwr'][n]['SpecIndex'])
-                RawPwr.append(np.array(SegyDict['pwr'].trace.raw[PwrIndex[0]: PwrIndex[1]].T))
-                VInt.append(np.array(SegyDict['pwr'].attributes(segyio.TraceField.offset)[PwrIndex[0]: PwrIndex[1]]))
-                NameList.append(n.split('_'))
+                out, STKInfo = net(pwr, stkG, stkC, VMM)
+                PredSeg, STKInfo = out.squeeze(), STKInfo.squeeze()
+                RawPwr, VInt, NameList = [], [], []
+                for n in name:
+                    PwrIndex = np.array(H5Dict['pwr'][n]['SpecIndex'])
+                    RawPwr.append(np.array(SegyDict['pwr'].trace.raw[PwrIndex[0]: PwrIndex[1]].T))
+                    VInt.append(np.array(SegyDict['pwr'].attributes(segyio.TraceField.offset)[PwrIndex[0]: PwrIndex[1]]))
+                    NameList.append(n.split('_'))
 
-            # get velocity Picking
-            AP, _ = GetResult(PredSeg, opt.t0Int, VInt, threshold=opt.Predthre)
-            # VMAE  
-            for ind, name_single in enumerate(name):
-                PickDict.setdefault(name_single, {'AP': AP[ind], 'MP': MP[ind].numpy(), 'Pwr': pwr[ind, 0, :].cpu().detach().numpy(), 'Seg': out[ind].cpu().detach().numpy()})
-            bar.update(1)
+                # get velocity Picking
+                AP, APPeaks = GetResult(PredSeg.cpu().numpy(), opt.t0Int, VInt, threshold=opt.Predthre)
+                # VMAE  
+                for ind, name_single in enumerate(name):
+                    PickDict.setdefault(name_single, {'AP': AP[ind], 'APPeaks': APPeaks[ind], 'MP': MP[ind].numpy(), 'Pwr': pwr[ind, 0, :].cpu().detach().numpy(), 'Seg': out[ind].cpu().detach().numpy(), 'VInt': VInt[ind]})
+                bar.update(1)
+    else:
+        PickDict = np.load(os.path.join(opt.OutputPath, '0-PickDict.npy'), allow_pickle=True).item()
+        for name, ResultDict in PickDict.items():
+            AP, APPeaks = GetResult(PickDict[name]['Seg'], opt.t0Int, [PickDict[name]['VInt']], threshold=opt.Predthre)
+            PickDict[name]['APPeaks'] = APPeaks[0]
+            PickDict[name]['AP'] = AP[0]
 
     PredCost = time.time() - startP 
 
@@ -135,20 +141,26 @@ def test():
     # Compute VMAE
     for name, ResultDict in PickDict.items():
         vmae = np.mean(np.abs(ResultDict['AP'][:, 1] - ResultDict['MP'][:, 1]))
-        PickDict[name].setdefault('VMAE', vmae)
+        PickDict[name]['VMAE'] = vmae
     # Save result
     np.save(os.path.join(opt.OutputPath, '0-PickDict.npy'), PickDict)
 
     ## visual result
     # 1 hist of VMAE results
     VMAEList = [RDict['VMAE'] for RDict in PickDict.values()]
+    print('test mean VMAE: %.3f' % (np.mean(VMAEList)))
     VMAEHist(VMAEList, SavePath=os.path.join(opt.OutputPath, '1-VMAEHist'))
+    # get the bad sample index
+    BadSample = [name for name in PickDict.keys() if PickDict[name]['VMAE'] > 50]
 
     # 2 Visual Part Bad Results
-    for name in VisualSample:
+    for name in BadSample:
         ResultDict = PickDict[name]
+        print(name, 'VMAE: %.3f' % ResultDict['VMAE'])
         # 2.1 Pwr and Seg Map
         PwrASeg(ResultDict['Pwr'], ResultDict['Seg'], SavePath=os.path.join(opt.OutputPath, '2-1-PwrASeg %s' % name))
+        # 2.2.1 AP peaks and MP curve
+        InterpResult(ResultDict['APPeaks'], ResultDict['MP'], SavePath=os.path.join(opt.OutputPath, '2-2-1-InterpResult %s' % name))
         # 2.2 Seg with AP and MP 
         PwrIndex = np.array(H5Dict['pwr'][name]['SpecIndex'])
         vVec = np.array(SegyDict['pwr'].attributes(segyio.TraceField.offset)[PwrIndex[0]: PwrIndex[1]])
@@ -157,7 +169,7 @@ def test():
         GthIndex = np.array(H5Dict['gth'][name]['GatherIndex'])
         Gth = np.array(SegyDict['gth'].trace.raw[GthIndex[0]: GthIndex[1]].T)
         OVec = np.array(SegyDict['gth'].attributes(segyio.TraceField.offset)[GthIndex[0]: GthIndex[1]])
-        AP = interpolation(ResultDict['AP'], np.array(SegyDict['gth'].samples), vVec)
+        AP = interpolation2(ResultDict['AP'], np.array(SegyDict['gth'].samples), vVec, RefRange=300)
         NMOGth = NMOCorr(Gth, np.array(SegyDict['gth'].samples), OVec, AP[:, 1], CutC=1.2)
         CMPNMO(Gth, NMOGth, SavePath=os.path.join(opt.OutputPath, '2-3-CMPNMO %s' % name))
 
@@ -166,10 +178,10 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--DataSet', type=str, default='hade', help='Dataset Root Path')
     parser.add_argument('--DataSetRoot', type=str, default='E:\\Spectrum\\hade', help='Dataset Root Path')
-    parser.add_argument('--LoadModel', type=str, default=r'F:\\VSP-MIFN\\0Ablation\DS_hade-SGSL_11-SR_0.80-LR_0.0010-BS_8-SH_256-SW_256-PT_0.10-SGSM_mute-RT_0', help='Model Path')
+    parser.add_argument('--LoadModel', type=str, default=r'F:\\VSP-MIFN\\0Ablation\DS_hade-SGSL_15-SR_0.80-LR_0.0100-BS_32-SH_256-SW_256-PT_0.10-SGSM_mute-RT_0', help='Model Path')
     parser.add_argument('--OutputPath', type=str, default='result', help='Path of Output')
     parser.add_argument('--SGSMode', type=str, default='all')
-    parser.add_argument('--Predthre', type=float, default=0.3)
+    parser.add_argument('--Predthre', type=float, default=0.15)
     parser.add_argument('--Resave', type=int, default=0)
     parser.add_argument('--GPUNO', type=int, default=0)
     parser.add_argument('--PredBS', type=int, default=64, help='The batchsize of Predict')
