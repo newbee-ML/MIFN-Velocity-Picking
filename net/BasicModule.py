@@ -264,25 +264,28 @@ class UNet(nn.Module):
                 if m.bias is not None:
                     m.bias.data.zero_()
 
-    def forward(self, x):
+    def forward(self, x, save):
+        feature = {}
         d1 = self.down1(x)  # 8     H       W
         d2 = self.down2(d1)  # 16    H/2     W/2
         d3 = self.down3(d2)  # 32    H/4     W/4
         d4 = self.down4(d3)  # 64    H/8     W/8
-
-        out = self.center(d4)  # 128  H/16   W/16
-
-        out = self.up4(out, d4)  # 64    H/8     W/8
-        out = self.up3(out, d3)  # 32    H/4     W/4
-        out = self.up2(out, d2)  # 16    H/2     W/2
-        out = self.up1(out, d1)  # 8     H       W
-
-        out = self.last(out)  # 1     H       W
-
-        return out
-
-        
-if __name__ == '__main__':
-    x = torch.rand((2, 1, 3500, 15))
-    f = GatherEncoder()
-    print(f(x).shape)
+        med = self.center(d4)  # 128  H/16   W/16
+        out1 = self.up4(med, d4)  # 64    H/8     W/8
+        out2 = self.up3(out1, d3)  # 32    H/4     W/4
+        out3 = self.up2(out2, d2)  # 16    H/2     W/2
+        out4 = self.up1(out3, d1)  # 8     H       W
+        seg = self.last(out4)  # 1     H       W
+        if save:
+            feature.setdefault('UNet-x', x)
+            feature.setdefault('UNet-d1', d1)
+            feature.setdefault('UNet-d2', d2)
+            feature.setdefault('UNet-d3', d3)
+            feature.setdefault('UNet-d4', d4)
+            feature.setdefault('UNet-med', med)
+            feature.setdefault('UNet-out1', out1)
+            feature.setdefault('UNet-out2', out2)
+            feature.setdefault('UNet-out3', out3)
+            feature.setdefault('UNet-out4', out4)
+            feature.setdefault('UNet-seg', seg)
+        return seg, feature

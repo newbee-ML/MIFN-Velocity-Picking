@@ -256,7 +256,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--DataSetRoot', type=str, default='E:\\Spectrum\\mar',  help='Dataset Root Path')
     parser.add_argument('--DataSet', type=str, default='mar', help='Dataset Root Path')
-    parser.add_argument('--OutputPath', type=str, default='F:\\VSP-MIFN\\0Ablation', help='Path of Output')
+    parser.add_argument('--OutputPath', type=str, default='F:\\VSP-MIFN\\1TransferL', help='Path of Output')
     parser.add_argument('--LoadModel', type=str, help='Load Old to train (Path)', default='F:\VSP-MIFN\\0Ablation\DS_dq8-SGSL_15-SR_0.80-LR_0.0100-BS_32-SH_256-SW_256-PT_0.10-SGSM_mute-RT_0\model\Best.pth')
     parser.add_argument('--SGSMode', type=str, default='mute')
     parser.add_argument('--GatherLen', type=int, default=15)

@@ -24,7 +24,7 @@ class MultiInfoNet(nn.Module):
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0)
 
-    def forward(self, spec, gather, cv, VMM):
+    def forward(self, spec, gather, cv, VMM, save=False):
         """
         :param spec: velocity spectrum matrix             | shape = BS * K'* H * W
         :param gather: gather data                        | shape = BS * K * t * W'
@@ -35,6 +35,11 @@ class MultiInfoNet(nn.Module):
             x: Segmentation Map                           | shape = BS * 1 * H * W
             stkFeaMap: Stk Data Encode                    | shape = BS * 1 * H * W
         """ 
+        Feature = {}
         stkFeaMap = self.STKEncoder(gather, cv, VMM)
-        x = self.UNet(torch.cat((spec, stkFeaMap), 1))
-        return x, stkFeaMap
+        x, feature = self.UNet(torch.cat((spec, stkFeaMap), 1), save)
+        if save:
+            Feature.setdefault('Stk', stkFeaMap)
+            for key, tensor in feature.items():
+                Feature.setdefault(key, tensor)
+        return x, Feature

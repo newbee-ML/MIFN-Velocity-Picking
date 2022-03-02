@@ -534,3 +534,41 @@ def CMPNMO(Gth, NMOGth, SavePath=None):
     else:
         plt.savefig(SavePath, dpi=100, bbox_inches='tight')
     plt.close('all')
+
+
+# 3 visual feature maps
+def NetFeatureMap(feature, cmap='gray', SavePath=None):
+    if len(feature.shape) == 2:
+        feature = feature[np.newaxis, ...]
+    FeatureNum = feature.shape[0]
+    if FeatureNum > 3:
+        sqrtR = np.sqrt(FeatureNum)
+        ColNum = int(sqrtR) if sqrtR**2 == FeatureNum else int(sqrtR)+1
+    else:
+        ColNum = FeatureNum
+    RowNum = int(FeatureNum//ColNum if FeatureNum % ColNum == 0 else FeatureNum//ColNum + 1)
+    _, axs = plt.subplots(ncols=ColNum, nrows=RowNum)
+    # remove the axis
+    if FeatureNum == 1:
+        axs.set(xticks=[], yticks=[])
+    else:
+        for ax in axs.flat:
+            ax.set(xticks=[], yticks=[])
+        axs = axs.flat
+        for ax in axs[FeatureNum:]:
+            ax.remove()
+        axs = axs[:FeatureNum]
+    # plot the subfig
+    for ind in range(FeatureNum):
+        FeatureMap = feature[ind]
+        ScaledFeature = 255 - (FeatureMap - np.min(FeatureMap)) / np.ptp(FeatureMap) * 255
+        ScaledFeature = ScaledFeature.astype(np.uint8)
+        if FeatureNum > 1:
+            axs[ind].imshow(ScaledFeature, cmap=cmap, aspect='auto')
+        else:
+            axs.imshow(ScaledFeature, cmap=cmap, aspect='auto')
+    if SavePath is None:
+        plt.show()
+    else:
+        plt.savefig(SavePath, dpi=100, bbox_inches='tight')
+    plt.close('all')

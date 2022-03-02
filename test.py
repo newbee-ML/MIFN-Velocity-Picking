@@ -26,8 +26,10 @@ def CheckSavePath(opt):
     if opt.Resave:
         if os.path.exists(opt.OutputPath):
             shutil.rmtree(opt.OutputPath)
-    if not os.path.exists(opt.OutputPath):
-        os.makedirs(opt.OutputPath)
+    FileList = ['FigResults', 'FeatureMaps']
+    for file in FileList:
+        if not os.path.exists(os.path.join(opt.OutputPath, file)):
+            os.makedirs(os.path.join(opt.OutputPath, file))
 
 
 def test():
@@ -109,21 +111,25 @@ def test():
                     pwr = pwr.cuda(opt.GPUNO)
                     stkG = stkG.cuda(opt.GPUNO)
                     stkC = stkC.cuda(opt.GPUNO)
+                
+                out, feature = net(pwr, stkG, stkC, VMM, True)
+                PredSeg = out.squeeze()
 
-                out, STKInfo = net(pwr, stkG, stkC, VMM)
-                PredSeg, STKInfo = out.squeeze(), STKInfo.squeeze()
-                RawPwr, VInt, NameList = [], [], []
+                # save the Vint information
+                VInt = []
                 for n in name:
                     PwrIndex = np.array(H5Dict['pwr'][n]['SpecIndex'])
-                    RawPwr.append(np.array(SegyDict['pwr'].trace.raw[PwrIndex[0]: PwrIndex[1]].T))
                     VInt.append(np.array(SegyDict['pwr'].attributes(segyio.TraceField.offset)[PwrIndex[0]: PwrIndex[1]]))
-                    NameList.append(n.split('_'))
 
                 # get velocity Picking
                 AP, APPeaks = GetResult(PredSeg.cpu().numpy(), opt.t0Int, VInt, threshold=opt.Predthre)
-                # VMAE  
+                # save the picking result
                 for ind, name_single in enumerate(name):
-                    PickDict.setdefault(name_single, {'AP': AP[ind], 'APPeaks': APPeaks[ind], 'MP': MP[ind].numpy(), 'Pwr': pwr[ind, 0, :].cpu().detach().numpy(), 'Seg': out[ind].cpu().detach().numpy(), 'VInt': VInt[ind]})
+                    FeatureN = {}
+                    for key, featuremaps in feature.items():
+                        FeatureN.setdefault(key, featuremaps[ind].squeeze().cpu().numpy())
+                    PickDict.setdefault(name_single, {'AP': AP[ind], 'APPeaks': APPeaks[ind], 'MP': MP[ind].numpy(), 'Pwr': pwr[ind, 0, :].cpu().detach().numpy(), 'Seg': out[ind].cpu().detach().numpy(), 'VInt': VInt[ind], 'Feature': FeatureN})
+
                 bar.update(1)
     else:
         PickDict = np.load(os.path.join(opt.OutputPath, '0-PickDict.npy'), allow_pickle=True).item()
@@ -156,20 +162,24 @@ def test():
         ResultDict = PickDict[name]
         print(name, 'VMAE: %.3f' % ResultDict['VMAE'])
         # 2.1 Pwr and Seg Map
-        PwrASeg(ResultDict['Pwr'], ResultDict['Seg'], SavePath=os.path.join(opt.OutputPath, '2-1-PwrASeg %s' % name))
+        PwrASeg(ResultDict['Pwr'], ResultDict['Seg'], SavePath=os.path.join(opt.OutputPath, 'FigResults', '2-1-PwrASeg %s' % name))
         # 2.2.1 AP peaks and MP curve
-        InterpResult(ResultDict['APPeaks'], ResultDict['MP'], SavePath=os.path.join(opt.OutputPath, '2-2-1-InterpResult %s' % name))
+        InterpResult(ResultDict['APPeaks'], ResultDict['MP'], SavePath=os.path.join(opt.OutputPath, 'FigResults', '2-2-1-InterpResult %s' % name))
         # 2.2 Seg with AP and MP 
         PwrIndex = np.array(H5Dict['pwr'][name]['SpecIndex'])
         vVec = np.array(SegyDict['pwr'].attributes(segyio.TraceField.offset)[PwrIndex[0]: PwrIndex[1]])
-        SegPick(ResultDict['Seg'], opt.t0Int, vVec, ResultDict['AP'], ResultDict['MP'], SavePath=os.path.join(opt.OutputPath, '2-2-SegPick %s' % name))
+        SegPick(ResultDict['Seg'], opt.t0Int, vVec, ResultDict['AP'], ResultDict['MP'], SavePath=os.path.join(opt.OutputPath, 'FigResults', '2-2-SegPick %s' % name))
         # 2.3 CMP gather and NMO result
         GthIndex = np.array(H5Dict['gth'][name]['GatherIndex'])
         Gth = np.array(SegyDict['gth'].trace.raw[GthIndex[0]: GthIndex[1]].T)
         OVec = np.array(SegyDict['gth'].attributes(segyio.TraceField.offset)[GthIndex[0]: GthIndex[1]])
         AP = interpolation2(ResultDict['AP'], np.array(SegyDict['gth'].samples), vVec, RefRange=300)
         NMOGth = NMOCorr(Gth, np.array(SegyDict['gth'].samples), OVec, AP[:, 1], CutC=1.2)
-        CMPNMO(Gth, NMOGth, SavePath=os.path.join(opt.OutputPath, '2-3-CMPNMO %s' % name))
+        CMPNMO(Gth, NMOGth, SavePath=os.path.join(opt.OutputPath, 'FigResults', '2-3-CMPNMO %s' % name))
+        # 3 visual feature maps
+        for key, feature in ResultDict['Feature'].items():
+            NetFeatureMap(feature, 'seismic', os.path.join(opt.OutputPath, 'FeatureMaps', '3-%s-%s' % (name, key)))
+
 
 
 if __name__ == '__main__':

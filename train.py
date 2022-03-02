@@ -166,7 +166,7 @@ def train():
             stkC = stkC.cuda(opt.GPUNO)
 
         optimizer.zero_grad()
-        out, StkFeat = net(pwr, stkG, stkC, VMM)
+        out, _ = net(pwr, stkG, stkC, VMM)
 
         # compute loss
         loss = criterion(out.squeeze(), label)
@@ -175,12 +175,13 @@ def train():
         loss.backward()
         optimizer.step()
         loss_avg.append(loss.item())
+        # save loss lr & seg map
         writer.add_scalar('Train-Loss', loss.item(), global_step=countIter)
         writer.add_scalar('Train-Lr', optimizer.param_groups[0]['lr'], global_step=countIter)
         for ind, name_ind in enumerate(name):
             if name_ind in VisualSample:
                 writer.add_image('SegProbMap-%s' % name_ind, out[ind].squeeze(), global_step=epoch, dataformats='HW')
-                writer.add_image('StkFeat-%s' % name_ind, StkFeat[ind].squeeze(), global_step=epoch, dataformats='HW')
+
         # print the log per opt.MsgIter
         if countIter % opt.MsgIter == 0:
             loss_avg = sum(loss_avg) / len(loss_avg)
