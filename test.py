@@ -89,7 +89,7 @@ def test():
     # if have predicted then compute the VMAE result
     if not os.path.exists(os.path.join(opt.OutputPath, '0-PickDict.npy')):
         # Load Predict Network
-        net = MultiInfoNet(opt.t0Int, opt, in_channels=11, resize=Resize)
+        net = MultiInfoNet(opt.t0Int, opt, mode=ParaDict['SGSM'], in_channels=11, resize=Resize)
         if use_gpu:
             net = net.cuda(opt.GPUNO)
         net.eval()
@@ -149,7 +149,7 @@ def test():
     print('test mean VMAE: %.3f' % (np.mean(VMAEList)))
     VMAEHist(VMAEList, SavePath=os.path.join(opt.OutputPath, '1-VMAEHist'))
     # get the bad sample index
-    BadSample = [name for name in PickDict.keys() if PickDict[name]['VMAE'] > 50]
+    BadSample = [name for name in PickDict.keys() if PickDict[name]['VMAE'] > 10]
 
     # 2 Visual Part Bad Results
     for name in BadSample:
@@ -177,12 +177,11 @@ if __name__ == '__main__':
     parser.add_argument('--DataSet', type=str, default='hade', help='Dataset Root Path')
     parser.add_argument('--DataSetRoot', type=str, default='E:\\Spectrum\\hade', help='Dataset Root Path')
     parser.add_argument('--LoadModel', type=str, default=r'F:\\VSP-MIFN\\0Ablation\DS_hade-SGSL_15-SR_0.80-LR_0.0100-BS_32-SH_256-SW_256-PT_0.10-SGSM_mute-RT_0', help='Model Path')
-    parser.add_argument('--OutputPath', type=str, default='result', help='Path of Output')
-    parser.add_argument('--SGSMode', type=str, default='all')
+    parser.add_argument('--OutputPath', type=str, help='Path of Output')
     parser.add_argument('--Predthre', type=float, default=0.15)
     parser.add_argument('--Resave', type=int, default=0)
     parser.add_argument('--GPUNO', type=int, default=0)
-    parser.add_argument('--PredBS', type=int, default=64, help='The batchsize of Predict')
+    parser.add_argument('--PredBS', type=int, default=32, help='The batchsize of Predict')
     parser.add_argument('--t0Int', type=list, default=[])
     opt = parser.parse_args()
 

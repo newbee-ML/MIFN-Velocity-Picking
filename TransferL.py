@@ -131,6 +131,16 @@ def train():
         else:
             raise "There is no such model file, start a new training!"
     else:
+        if opt.LoadModel is not None:
+            if os.path.exists(opt.LoadModel):
+                print("Load Pretrain Model Successfully!")
+                LoadModelDict = torch.load(opt.LoadModel)
+                net.load_state_dict(LoadModelDict['Weights'])
+                TrainParaDict = LoadModelDict['TrainParas']
+                countIter, epoch = TrainParaDict['it'], TrainParaDict['epoch']
+                bestVloss, lrStart = TrainParaDict['bestLoss'], TrainParaDict['lr']
+            else:
+                raise "There is no such model file, start a new training!" 
         countIter, epoch, lrStart, bestVloss = 0, 1, opt.lrStart, 1e10
     criterion = nn.BCELoss()
 
@@ -244,13 +254,14 @@ def train():
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--DataSetRoot', type=str, default='E:\\Spectrum\\hade',  help='Dataset Root Path')
-    parser.add_argument('--DataSet', type=str, default='hade', help='Dataset Root Path')
+    parser.add_argument('--DataSetRoot', type=str, default='E:\\Spectrum\\mar',  help='Dataset Root Path')
+    parser.add_argument('--DataSet', type=str, default='mar', help='Dataset Root Path')
     parser.add_argument('--OutputPath', type=str, default='F:\\VSP-MIFN\\0Ablation', help='Path of Output')
+    parser.add_argument('--LoadModel', type=str, help='Load Old to train (Path)', default='F:\VSP-MIFN\\0Ablation\DS_dq8-SGSL_15-SR_0.80-LR_0.0100-BS_32-SH_256-SW_256-PT_0.10-SGSM_mute-RT_0\model\Best.pth')
     parser.add_argument('--SGSMode', type=str, default='mute')
     parser.add_argument('--GatherLen', type=int, default=15)
     parser.add_argument('--RepeatTime', type=int, default=0)
-    parser.add_argument('--SeedRate', type=float, default=0.8)
+    parser.add_argument('--SeedRate', type=float, default=0.2)
     parser.add_argument('--ReTrain', type=int, default=1)
     parser.add_argument('--GPUNO', type=int, default=0)
     parser.add_argument('--Resize', type=list, help='Reset Image Size')
@@ -260,9 +271,8 @@ if __name__ == '__main__':
     parser.add_argument('--MaxIter', type=int, default=10000, help='max iteration')
     parser.add_argument('--SaveIter', type=int, default=100, help='checkpoint each SaveIter')
     parser.add_argument('--MsgIter', type=int, default=20, help='log the loss each MsgIter')
-    parser.add_argument('--lrStart', type=float, default=0.001, help='the beginning learning rate')
-    parser.add_argument('--LoadModel', type=str, help='Load Old to train (Path)')
-    parser.add_argument('--trainBS', type=int, default=4, help='The batchsize of train')
+    parser.add_argument('--lrStart', type=float, default=0.01, help='the beginning learning rate')
+    parser.add_argument('--trainBS', type=int, default=32, help='The batchsize of train')
     parser.add_argument('--valBS', type=int, default=16, help='The batchsize of valid')
     parser.add_argument('--t0Int', type=list, default=[])
     parser.add_argument('--vInt', type=list, default=[])

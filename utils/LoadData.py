@@ -150,7 +150,7 @@ def generate_feature_map(ori_spec, resize, visual=0):
     ParaDict = {
         'ws': [5, 5, 5, 10, 10, 10, 15, 15, 15],
         'st': [1, 2, 3, 1, 2, 3, 1, 2, 3],
-        'eec': [1, 1.5, 2, 1, 1.5, 2, 1, 1.5, 2],
+        'eec': [1, 1.5, 1.8, 1, 1.5, 1.8, 1, 1.5, 1.8],
         'ln': [5, 8, 12, 5, 8, 12, 5, 8, 12]
     }
     feature_map = [scale_img(ori_spec, resize_n=resize)]
@@ -240,7 +240,6 @@ class DLSpec(data.Dataset):
             FM = scale_img(DataDict['spectrum'], resize_n=self.resize)
 
         return FM, stkG, stkC, mask, VMM, ManualCurve, self.index[index]
-
 
     def __len__(self):
         return len(self.index)

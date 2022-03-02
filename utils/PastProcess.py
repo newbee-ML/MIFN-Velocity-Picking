@@ -2,6 +2,7 @@ import numpy as np
 from scipy import interpolate
 from sklearn import linear_model
 import copy
+import pwlf
 
 """
 Past-processing for segmentation map
@@ -41,11 +42,22 @@ def GetResult(SegMat, t0Ind, vInd, threshold=0.1):
 
     # 3 remove the outliers
     FinalPeaks = ScaledPeaks
-    # 4 interpolate & regression
 
+    # 4 interpolate & regression
     Curve = np.array([interpolation2(FinalPeak, t0Ind, vInd[ind], RefRange=300) for ind, FinalPeak in enumerate(FinalPeaks)])
 
+    # # 5 Get the key points
+    # ResModel = KeyPoints(Curve)
+
     return Curve, FinalPeaks
+
+
+# # extract the key points
+# def KeyPoints(Curve):
+#     my_pwlf = pwlf.PiecewiseLinFit(Curve[:, 0], Curve[:, 1])
+#     # fit the data for four line segments
+#     res = my_pwlf.fit(6)
+#     return res
 
 
 # get the points with high probability on the segmentation map
