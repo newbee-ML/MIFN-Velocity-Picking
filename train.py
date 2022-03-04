@@ -1,20 +1,22 @@
+"""
+The main file for train MIFN
+Author: Hongtao Wang | stolzpi@163.com
+"""
 import sys
 import h5py
 import logging
 import numpy as np
+import pandas as pd
 import torch
-import copy
 import segyio
-import time
 import os
+import copy
 import random
 import shutil
 import warnings
-import datetime
 import argparse
 import torch.nn as nn
 from net.MIFNet import MultiInfoNet
-from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader
 from utils.LoadData import DLSpec
 from utils.logger import setup_logger
@@ -27,7 +29,11 @@ sys.path.append('..')
 warnings.filterwarnings("ignore")
 
 
-def CheckSavePath(BaseName):
+"""
+Initialize the folder
+"""
+
+def CheckSavePath(opt, BaseName):
     basicFile = ['log', 'model', 'TBLog']
     SavePath = os.path.join(opt.OutputPath, BaseName)
     if opt.ReTrain:
@@ -37,27 +43,73 @@ def CheckSavePath(BaseName):
             for file in basicFile:
                 Path = os.path.join(SavePath, file)
                 os.makedirs(Path)
-    else:
-        return 0
+
+"""
+Save the training parameters
+"""
+def SaveParameters(opt, BaseName):
+    ParaDict = opt.__dict__
+    ParaDict = {key: [value] for key, value in ParaDict.items()}
+    ParaDF = pd.DataFrame(ParaDict)
+    ParaDF.to_csv(os.path.join(opt.OutputPath, BaseName, 'TrainPara.csv'))
+
+
+"""
+Get the hyper parameters
+"""
+def GetTrainPara():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--DataSetRoot', type=str, default='E:\\Spectrum', help='Dataset Root Path')
+    parser.add_argument('--DataSet', type=str, default='hade', help='Dataset Root Path')
+    parser.add_argument('--EpName', type=str, default='Ep-1', help='The index of the experiment')
+    parser.add_argument('--OutputPath', type=str, default='F:\\VelocitySpectrum\\MIFN\\2GeneraTest', help='Path of Output')
+    parser.add_argument('--SGSMode', type=str, default='mute')
+    parser.add_argument('--GatherLen', type=int, default=15)
+    parser.add_argument('--RepeatTime', type=int, default=0)
+    parser.add_argument('--SeedRate', type=float, default=0.8)
+    parser.add_argument('--ReTrain', type=int, default=1)
+    parser.add_argument('--GPUNO', type=int, default=0)
+    parser.add_argument('--SizeH', type=int, default=256, help='Size Height')
+    parser.add_argument('--SizeW', type=int, default=256, help='Size Width')
+    parser.add_argument('--Predthre', type=float, default=0.1)
+    parser.add_argument('--MaxIter', type=int, default=10000, help='max iteration')
+    parser.add_argument('--SaveIter', type=int, default=100, help='checkpoint each SaveIter')
+    parser.add_argument('--MsgIter', type=int, default=20, help='log the loss each MsgIter')
+    parser.add_argument('--lrStart', type=float, default=0.001, help='the beginning learning rate')
+    parser.add_argument('--optimizer', type=str, default='adam', help=r"the optimizer of training, 'adam' or 'sgd'")
+    parser.add_argument('--PretrainModel', type=str, help='The path of pretrain model to train (Path)')
+    parser.add_argument('--trainBS', type=int, default=32, help='The batchsize of train')
+    parser.add_argument('--valBS', type=int, default=16, help='The batchsize of valid')
+    opt = parser.parse_args()
+    return opt
     
-        
 
+"""
+Main train function
+"""
 
-def train():
-    print('==== Begin to train ====')
-    # BaseName
-    BaseName = 'DS_%s-SGSL_%d-SR_%.2f-LR_%.4f-BS_%d-SH_%d-SW_%d-PT_%.2f-SGSM_%s-RT_%d' % (opt.DataSet, opt.GatherLen, opt.SeedRate, opt.lrStart, opt.trainBS, opt.SizeH, opt.SizeH, opt.Predthre, opt.SGSMode, opt.RepeatTime)
-
+def train(opt):
+    ####################
+    # base setting
+    ####################
+    BaseName = opt.EpName
+    # data set path setting
+    DataSetPath = os.path.join(opt.DataSetRoot, opt.DataSet)
     # check output folder and check path
-    CheckSavePath(BaseName)
-    opt.Resize = [int(opt.SizeH), int(opt.SizeW)]
+    CheckSavePath(opt, BaseName)
     TBPath = os.path.join(opt.OutputPath, BaseName, 'TBLog')
     writer = SummaryWriter(TBPath)
     BestPath = os.path.join(opt.OutputPath, BaseName, 'model', 'Best.pth')
     LogPath = os.path.join(opt.OutputPath, BaseName, 'log')
     setup_logger(LogPath)
     logger = logging.getLogger()
-    logger.info('Training --- %s' % BaseName)
+    logger.info('%s start to train ...' % BaseName)
+    # save the train parameters to csv
+    SaveParameters(opt, BaseName)
+
+    #######################################
+    # load data from segy, H5file and npy
+    #######################################
 
     # load segy data
     SegyName = {'pwr': 'vel.pwr.sgy',
@@ -65,7 +117,7 @@ def train():
                 'gth': 'vel.gth.sgy'}
     SegyDict = {}
     for name, path in SegyName.items():
-        SegyDict.setdefault(name, segyio.open(os.path.join(opt.DataSetRoot, 'segy', path), "r", strict=False))
+        SegyDict.setdefault(name, segyio.open(os.path.join(DataSetPath, 'segy', path), "r", strict=False))
 
     # load h5 file
     H5Name = {'pwr': 'SpecInfo.h5',
@@ -73,10 +125,10 @@ def train():
               'gth': 'GatherInfo.h5'}
     H5Dict = {}
     for name, path in H5Name.items():
-        H5Dict.setdefault(name, h5py.File(os.path.join(opt.DataSetRoot, 'h5File', path), 'r'))
+        H5Dict.setdefault(name, h5py.File(os.path.join(DataSetPath, 'h5File', path), 'r'))
 
     # load label.npy
-    LabelDict = np.load(os.path.join(opt.DataSetRoot, 't_v_labels.npy'), allow_pickle=True).item()
+    LabelDict = np.load(os.path.join(DataSetPath, 't_v_labels.npy'), allow_pickle=True).item()
     HaveLabelIndex = []
     for lineN in LabelDict.keys():
         for cdpN in LabelDict[lineN].keys():
@@ -85,20 +137,44 @@ def train():
     stk_index = set(H5Dict['stk'].keys())
     gth_index = set(H5Dict['gth'].keys())
 
-    # find common index
+    #########################################
+    # split the train, valid and test set
+    #########################################
     Index = sorted(list((pwr_index & stk_index) & (gth_index & set(HaveLabelIndex))))
-    trainIndex, _ = train_test_split(Index, test_size=0.2, random_state=123)
-    trainIndex, validIndex = train_test_split(trainIndex, test_size=1-opt.SeedRate, random_state=123)
+    IndexDict = {}
+    for index in Index:
+        line, cdp = index.split('_')
+        IndexDict.setdefault(int(line), [])
+        IndexDict[int(line)].append(int(cdp))
+    LineIndex = sorted(list(IndexDict.keys()))
+    # use the last 20% for test set
+    LastSplit1, LastSplit2 = int(len(LineIndex)*0.6), int(len(LineIndex)*0.8)
+    # use the first sr% (seed rate) for train set and the other for valid set
+    MedSplit = int(LastSplit1*opt.SeedRate)
+    trainLine, validLine, testLine = LineIndex[:MedSplit], LineIndex[LastSplit1: LastSplit2], LineIndex[LastSplit2:]
+    logger.info('There are %d lines, using for training: ' % len(trainLine) + ','.join(map(str, trainLine)))
+    logger.info('There are %d lines, using for valid: ' % len(validLine) + ','.join(map(str, validLine)))
+    logger.info('There are %d lines, using for test: ' % len(testLine) + ','.join(map(str, testLine)))
+    trainIndex, validIndex = [], []
+    for line in trainLine:
+        for cdp in IndexDict[line]:
+            trainIndex.append('%d_%d' % (line, cdp))
+    for line in validLine:
+        for cdp in IndexDict[line]:
+            validIndex.append('%d_%d' % (line, cdp))
     random.seed(123)
     VisualSample = random.sample(trainIndex, 16)
     print('Train Num %d, Valid Num %d' % (len(trainIndex), len(validIndex)))
 
+    ##################################
+    # build the data loader
+    ##################################
     # load t0 ind
-    opt.t0Int = np.array(SegyDict['pwr'].samples)
-
+    t0Int = np.array(SegyDict['pwr'].samples)
+    resize = [opt.SizeH, opt.SizeW]
     # build data loader
-    ds = DLSpec(SegyDict, H5Dict, LabelDict, trainIndex, opt.t0Int, resize=opt.Resize, GatherLen=opt.GatherLen)
-    dsval = DLSpec(SegyDict, H5Dict, LabelDict, validIndex, opt.t0Int, resize=opt.Resize, GatherLen=opt.GatherLen)
+    ds = DLSpec(SegyDict, H5Dict, LabelDict, trainIndex, t0Int, resize=resize, GatherLen=opt.GatherLen)
+    dsval = DLSpec(SegyDict, H5Dict, LabelDict, validIndex, t0Int, resize=resize, GatherLen=opt.GatherLen)
     dl = DataLoader(ds,
                     batch_size=opt.trainBS,
                     shuffle=True,
@@ -111,39 +187,58 @@ def train():
                        num_workers=0,
                        drop_last=True)
 
+    ###################################
+    # load the network
+    ###################################
+
     # check gpu is available
-    use_gpu = torch.cuda.device_count() > 0
+    if torch.cuda.device_count() > 0:
+        device = opt.GPUNO
+    else:
+        device = 'cpu'
 
     # load network
-    net = MultiInfoNet(opt.t0Int, opt, in_channels=11, resize=opt.Resize, mode=opt.SGSMode)
-    if use_gpu:
-        net = net.cuda(opt.GPUNO)
+    net = MultiInfoNet(t0Int, in_channels=11, resize=resize, mode=opt.SGSMode, device=device)
+    if device is not 'cpu':
+        net = net.cuda(device)
     net.train()
-    if not opt.ReTrain:
-        opt.LoadModel = BestPath
-        if os.path.exists(opt.LoadModel):
+
+    # load pretrain model or last model
+    if opt.PretrainModel is None:
+        if os.path.exists(BestPath):
             print("Load Last Model Successfully!")
-            LoadModelDict = torch.load(opt.LoadModel)
+            LoadModelDict = torch.load(BestPath)
             net.load_state_dict(LoadModelDict['Weights'])
             TrainParaDict = LoadModelDict['TrainParas']
             countIter, epoch = TrainParaDict['it'], TrainParaDict['epoch']
-            bestVloss, lrStart = TrainParaDict['bestLoss'], TrainParaDict['lr']
+            BestValidLoss, lrStart = TrainParaDict['bestLoss'], TrainParaDict['lr']
         else:
-            raise "There is no such model file, start a new training!"
+            print("Start a new training!")
+            countIter, epoch, lrStart, BestValidLoss = 0, 1, opt.lrStart, 1e10
     else:
-        countIter, epoch, lrStart, bestVloss = 0, 1, opt.lrStart, 1e10
+        print("Load PretrainModel Successfully!")
+        LoadModelDict = torch.load(opt.PretrainModel)
+        net.load_state_dict(LoadModelDict['Weights'])
+        countIter, epoch, lrStart, BestValidLoss = 0, 1, opt.lrStart, 1e10
+    
+    # loss setting
     criterion = nn.BCELoss()
 
     # define the optimizer
-    optimizer = torch.optim.Adam(net.parameters(), lr=lrStart)
+    if opt.optimizer is 'adam':
+        optimizer = torch.optim.Adam(net.parameters(), lr=lrStart)
+    elif opt.optimizer is 'sgd':
+        optimizer = torch.optim.SGD(net.parameters(), lr=lrStart, momentum=0.9)
 
     # define the lr_scheduler of the optimizer
-    scheduler = MultiStepLR(optimizer, [10, 30, 100], 0.1)
+    scheduler = MultiStepLR(optimizer, [int(10/opt.SeedRate), int(100/opt.SeedRate)], 0.1)
     
-    ####### Start to Train ############
+    ####################################
+    # training iteration 
+    ####################################
+
     # initialize
-    loss_avg = []
-    st = glob_st = time.time()
+    LossList, BestValidVMAE, EarlyStopCount = [], 1e8, 0
 
     # start the iteration
     diter = iter(dl)
@@ -152,19 +247,16 @@ def train():
             epoch += 1
             scheduler.step()
         countIter += 1
-        opt.iter = countIter
         try:
             pwr, stkG, stkC, label, VMM, _, name = next(diter)
         except StopIteration:
             diter = iter(dl)
             pwr, stkG, stkC, label, VMM, _, name = next(diter)
-
-        if use_gpu:
-            pwr = pwr.cuda(opt.GPUNO)
-            label = label.cuda(opt.GPUNO)
-            stkG = stkG.cuda(opt.GPUNO)
-            stkC = stkC.cuda(opt.GPUNO)
-
+        if device is not 'cpu':
+            pwr = pwr.cuda(device)
+            label = label.cuda(device)
+            stkG = stkG.cuda(device)
+            stkC = stkC.cuda(device)
         optimizer.zero_grad()
         out, _ = net(pwr, stkG, stkC, VMM)
 
@@ -174,7 +266,8 @@ def train():
         # update parameters
         loss.backward()
         optimizer.step()
-        loss_avg.append(loss.item())
+        LossList.append(loss.item())
+
         # save loss lr & seg map
         writer.add_scalar('Train-Loss', loss.item(), global_step=countIter)
         writer.add_scalar('Train-Lr', optimizer.param_groups[0]['lr'], global_step=countIter)
@@ -184,91 +277,60 @@ def train():
 
         # print the log per opt.MsgIter
         if countIter % opt.MsgIter == 0:
-            loss_avg = sum(loss_avg) / len(loss_avg)
             lr = optimizer.param_groups[0]['lr']
-            ed = time.time()
-            t_intv, glob_t_intv = ed - st, ed - glob_st
-            eta = int((opt.MaxIter - it) * (glob_t_intv / it))
-            eta = str(datetime.timedelta(seconds=eta))
-
-            msg = ', '.join([
-                'it: {it}/{max_it}',
-                'epoch: {epoch}',
-                'lr: {lr:.8f}',
-                'loss: {loss:.7f}',
-                'eta: {eta}',
-                'time: {time:.2f}s/{Alltime:.2f}s',
-            ]).format(
-                it=countIter,
-                epoch=epoch,
-                max_it=opt.MaxIter,
-                lr=lr,
-                loss=loss_avg,
-                time=t_intv,
-                eta=eta,
-                Alltime=t_intv * opt.MaxIter / opt.MsgIter,
-            )
+            msg = 'it: %d/%d, epoch: %d, lr: %.6f, train-loss: %.7f' % (countIter, opt.MaxIter, epoch, lr, sum(LossList) / len(LossList))
             logger.info(msg)
-            loss_avg = []
-            st = ed
+
         
         # check points
         if countIter % opt.SaveIter == 0:  
             net.eval()
             # evaluator
             with torch.no_grad():
-                LossValid, VMAEValid = EvaluateValid(net, dlval, criterion, opt,
-                                                     SegyDict, H5Dict, use_gpu=use_gpu)
+                LossValid, VMAEValid = EvaluateValid(net, dlval, criterion, 
+                                                     SegyDict, H5Dict, t0Int, opt.Predthre, device=device)
+                if VMAEValid < BestValidVMAE:
+                    BestValidVMAE = VMAEValid
                 writer.add_scalar('Valid-Loss', LossValid, global_step=countIter)
                 writer.add_scalar('Valid-VMAE', VMAEValid, global_step=countIter)
-            if LossValid < bestVloss:
-                bestVloss = copy.deepcopy(LossValid)
+
+            if LossValid < BestValidLoss:
+                BestValidLoss = LossValid
                 state = net.module.state_dict() if hasattr(net, 'module') else net.state_dict()
                 StateDict = {
                     'TrainParas': {'lr': optimizer.param_groups[0]['lr'], 
                                    'it': countIter,
                                    'epoch': epoch,
-                                   'bestLoss': bestVloss},
+                                   'bestLoss': BestValidLoss},
                     'Weights': state}
 
                 torch.save(StateDict, BestPath)
+                EarlyStopCount = 0
             else:
+                # count 1 time
+                EarlyStopCount += 1
                 # reload checkpoint pth
                 if os.path.exists(BestPath):
                     net.load_state_dict(torch.load(BestPath)['Weights'])
+                # if do not decreate for 5 times then early stop
+                if EarlyStopCount > 5:
+                    break
+            
+            # write the valid log
             try:
-                logger.info('it: %d/%d, epoch: %d, Loss: %.6f, VMAE: %.6f, BestLoss: %.6f' % (countIter, opt.MaxIter, epoch, LossValid, VMAEValid, bestVloss))
+                logger.info('it: %d/%d, epoch: %d, Loss: %.6f, VMAE: %.4f, best valid-Loss: %.6f, best valid-VMAE: %.4f' % (countIter, opt.MaxIter, epoch, LossValid, VMAEValid, BestValidLoss, BestValidVMAE))
             except TypeError:
                 logger.info('it: %d/%d, epoch: %d, TypeError')
-            net.train()
 
+            net.train()
+    # save the finish csv
+    ResultDF = pd.DataFrame({'BestValidLoss': [BestValidLoss], 'BestValidVMAE': [BestValidVMAE]})
+    ResultDF.to_csv(os.path.join(opt.OutputPath, BaseName, 'Result.csv'))
+    return BestValidLoss, BestValidVMAE
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--DataSetRoot', type=str, default='E:\\Spectrum\\hade',  help='Dataset Root Path')
-    parser.add_argument('--DataSet', type=str, default='hade', help='Dataset Root Path')
-    parser.add_argument('--OutputPath', type=str, default='F:\\VSP-MIFN\\0Ablation', help='Path of Output')
-    parser.add_argument('--SGSMode', type=str, default='mute')
-    parser.add_argument('--GatherLen', type=int, default=15)
-    parser.add_argument('--RepeatTime', type=int, default=0)
-    parser.add_argument('--SeedRate', type=float, default=0.8)
-    parser.add_argument('--ReTrain', type=int, default=1)
-    parser.add_argument('--GPUNO', type=int, default=0)
-    parser.add_argument('--Resize', type=list, help='Reset Image Size')
-    parser.add_argument('--SizeH', type=int, default=256, help='Size Height')
-    parser.add_argument('--SizeW', type=int, default=256, help='Size Width')
-    parser.add_argument('--Predthre', type=float, default=0.1)
-    parser.add_argument('--MaxIter', type=int, default=10000, help='max iteration')
-    parser.add_argument('--SaveIter', type=int, default=100, help='checkpoint each SaveIter')
-    parser.add_argument('--MsgIter', type=int, default=20, help='log the loss each MsgIter')
-    parser.add_argument('--lrStart', type=float, default=0.001, help='the beginning learning rate')
-    parser.add_argument('--LoadModel', type=str, help='Load Old to train (Path)')
-    parser.add_argument('--trainBS', type=int, default=4, help='The batchsize of train')
-    parser.add_argument('--valBS', type=int, default=16, help='The batchsize of valid')
-    parser.add_argument('--t0Int', type=list, default=[])
-    parser.add_argument('--vInt', type=list, default=[])
-    parser.add_argument('--iter', type=int, default=0)
-    opt = parser.parse_args()
+    # get hyper parameters
+    OptN = GetTrainPara()
 
     # start to train
-    train()
+    train(OptN)

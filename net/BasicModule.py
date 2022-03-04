@@ -94,7 +94,7 @@ class GatherEncoder(nn.Module):
 
 # Encoder for Velocity Curve
 class CVEncoder(nn.Module):
-    def __init__(self, tInt, opt, resize=(512, 256), ScaleSize=(256, 256)):
+    def __init__(self, tInt, resize=(512, 256), ScaleSize=(256, 256), device=0):
         super(CVEncoder, self).__init__()
         """
         :param tInt: velocity time interval             | e.g. [0, 20, 40, ..., 7000]
@@ -104,7 +104,7 @@ class CVEncoder(nn.Module):
         """
         self.tInt = tInt
         self.resize = resize
-        self.opt = opt
+        self.device = device
         self.ScaleSize = ScaleSize
 
     def forward(self, VelPoints, VMM):
@@ -142,7 +142,7 @@ class CVEncoder(nn.Module):
         SoftMask = torch.ones((VelCurveHot.shape[0], H * W)) * 0.01
         MaskOne = torch.ones_like(VelCurveHot) * 0.9
         SoftMask.scatter_add_(1, VelCurveHot, MaskOne)
-        SoftMask = SoftMask.view((BS, K, H, W)).cuda(self.opt.GPUNO)
+        SoftMask = SoftMask.view((BS, K, H, W)).cuda(self.device)
         # resize the mask to the size we need 
         RescaleSoftMask = F.interpolate(SoftMask, self.resize, mode='bilinear')
 
@@ -151,7 +151,7 @@ class CVEncoder(nn.Module):
 
 # Encoder for Stack Data (consists of CVEncoder and GatherEncoder)
 class STKEncoder(nn.Module):
-    def __init__(self, tInt, opt, mode='all', resize=(1024, 512)):
+    def __init__(self, tInt, mode='all', resize=(1024, 512), device=1):
         super(STKEncoder, self).__init__()
         """
         :param tInt: velocity time interval                     | e.g. [0, 20, 40, ..., 7000]
@@ -160,7 +160,7 @@ class STKEncoder(nn.Module):
         :param resize: the output size of the STK encode        | default: (1024, 512)
         """
         self.GEncoder = GatherEncoder(outLen=resize[0], mode=mode)
-        self.CVEncoder = CVEncoder(tInt, opt, resize=resize)
+        self.CVEncoder = CVEncoder(tInt, resize=resize, device=device)
         self.CBL = nn.Sequential(nn.Conv2d(1, 1, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=True), 
                                  nn.BatchNorm2d(1), 
                                  nn.LeakyReLU(0.1, inplace=True))

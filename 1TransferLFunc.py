@@ -148,7 +148,7 @@ def train():
     optimizer = torch.optim.Adam(net.parameters(), lr=lrStart)
 
     # define the lr_scheduler of the optimizer
-    scheduler = MultiStepLR(optimizer, [10, 30, 100], 0.1)
+    scheduler = MultiStepLR(optimizer, [200, 1000], 0.1)
     
     ####### Start to Train ############
     # initialize
@@ -176,7 +176,7 @@ def train():
             stkC = stkC.cuda(opt.GPUNO)
 
         optimizer.zero_grad()
-        out, StkFeat = net(pwr, stkG, stkC, VMM)
+        out, _ = net(pwr, stkG, stkC, VMM)
 
         # compute loss
         loss = criterion(out.squeeze(), label)
@@ -190,7 +190,7 @@ def train():
         for ind, name_ind in enumerate(name):
             if name_ind in VisualSample:
                 writer.add_image('SegProbMap-%s' % name_ind, out[ind].squeeze(), global_step=epoch, dataformats='HW')
-                writer.add_image('StkFeat-%s' % name_ind, StkFeat[ind].squeeze(), global_step=epoch, dataformats='HW')
+                # writer.add_image('StkFeat-%s' % name_ind, StkFeat[ind].squeeze(), global_step=epoch, dataformats='HW')
         # print the log per opt.MsgIter
         if countIter % opt.MsgIter == 0:
             loss_avg = sum(loss_avg) / len(loss_avg)
@@ -261,7 +261,7 @@ if __name__ == '__main__':
     parser.add_argument('--SGSMode', type=str, default='mute')
     parser.add_argument('--GatherLen', type=int, default=15)
     parser.add_argument('--RepeatTime', type=int, default=0)
-    parser.add_argument('--SeedRate', type=float, default=0.2)
+    parser.add_argument('--SeedRate', type=float, default=0.3)
     parser.add_argument('--ReTrain', type=int, default=1)
     parser.add_argument('--GPUNO', type=int, default=0)
     parser.add_argument('--Resize', type=list, help='Reset Image Size')

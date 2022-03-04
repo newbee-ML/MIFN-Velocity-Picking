@@ -3,7 +3,7 @@ from net.BasicModule import *
 
 # Multi-Information Fusion Network (Main Work)
 class MultiInfoNet(nn.Module):
-    def __init__(self, tInt, opt, mode='all', in_channels=11, resize=(1024, 512)):
+    def __init__(self, tInt, mode='all', in_channels=11, resize=(1024, 512), device=0):
         """
         :param tInt: velocity time interval | e.g. [0, 20, 40, ..., 7000]
         :param opt: Parameters
@@ -13,7 +13,7 @@ class MultiInfoNet(nn.Module):
         """
         super(MultiInfoNet, self).__init__()
         self.UNet = UNet(in_channels)
-        self.STKEncoder = STKEncoder(tInt, opt, resize=resize, mode=mode)
+        self.STKEncoder = STKEncoder(tInt, resize=resize, mode=mode, device=device)
         self.initialize()
 
     def initialize(self):

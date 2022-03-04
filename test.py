@@ -179,7 +179,7 @@ def test():
         # 3 visual feature maps
         for key, feature in ResultDict['Feature'].items():
             NetFeatureMap(feature, 'seismic', os.path.join(opt.OutputPath, 'FeatureMaps', '3-%s-%s' % (name, key)))
-
+    
 
 
 if __name__ == '__main__':

@@ -1,8 +1,6 @@
 import numpy as np
 from scipy import interpolate
 from sklearn import linear_model
-import copy
-import pwlf
 
 """
 Past-processing for segmentation map

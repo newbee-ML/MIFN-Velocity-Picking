@@ -11,19 +11,18 @@ Evaluate Processing for Network Training
 """
 
 
-def EvaluateValid(net, DataLoader, criterion, opt, SegyDict, H5Dict, use_gpu=1):
+def EvaluateValid(net, DataLoader, criterion, SegyDict, H5Dict, t0Int, Predthre, device=0):
     LossAvg = []
     VMAEAvg = []
     
     for i, (pwr, stkG, stkC, label, VMM, MC, name) in enumerate(DataLoader):
-        if use_gpu:
-            pwr = pwr.cuda(opt.GPUNO)
-            label = label.cuda(opt.GPUNO)
-            stkG = stkG.cuda(opt.GPUNO)
-            stkC = stkC.cuda(opt.GPUNO)
-        out, STKInfo = net(pwr, stkG, stkC, VMM)
-        out, STKInfo = out.squeeze(), STKInfo.squeeze()
-        PredSeg = out
+        if device is not 'cpu':
+            pwr = pwr.cuda(device)
+            label = label.cuda(device)
+            stkG = stkG.cuda(device)
+            stkC = stkC.cuda(device)
+        out, _ = net(pwr, stkG, stkC, VMM)
+        PredSeg = out.squeeze()
 
         # compute loss
         loss = criterion(out.squeeze(), label)
@@ -36,7 +35,7 @@ def EvaluateValid(net, DataLoader, criterion, opt, SegyDict, H5Dict, use_gpu=1):
             VInt.append(np.array(SegyDict['pwr'].attributes(segyio.TraceField.offset)
                                  [PwrIndex[0]: PwrIndex[1]]))
         # get velocity curve
-        AutoCurve, _ = GetResult(PredSeg.cpu().numpy(), opt.t0Int, VInt, threshold=opt.Predthre)
+        AutoCurve, _ = GetResult(PredSeg.cpu().numpy(), t0Int, VInt, threshold=Predthre)
         LossAvg.append(loss.item())
         MC = MC.numpy()
         mVMAE, _ = VMAE(AutoCurve, MC)
