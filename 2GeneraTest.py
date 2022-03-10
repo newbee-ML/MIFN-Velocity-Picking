@@ -7,11 +7,11 @@ import os
 #################################
 ParaDict = {'DataSet': ['str', ['hade', 'dq8']], 
             'OutputPath': ['str', ['F:\\VelocitySpectrum\\MIFN\\2GeneraTest']], 
-            'SeedRate': ['float', [0.2, 0.3, 0.5, 0.8, 1]], 
+            'SeedRate': ['float', [0.1, 0.4, 0.6, 0.7, 0.9]], 
             'SizeW': ['int', [128]], 
             'trainBS': ['int', [32]], 
             'lrStart': ['float', [0.01]],
-            'optimizer': ['str', ['sgd']]}
+            'optimizer': ['str', ['adam']]}
 
 
 #################################
@@ -23,7 +23,7 @@ EpList = ListPara(ParaDict)
 OptDefault = GetTrainPara()
 for ind, EpName in enumerate(EpList):
     try:
-        start = 20 + 1
+        start = 30 + 1
         # get the ep para dict
         EpDict = ParaStr2Dict(EpName, ParaDict)
         EpDict.setdefault('EpName', 'Ep-%d' % (ind+start))

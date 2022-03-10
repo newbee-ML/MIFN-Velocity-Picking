@@ -44,13 +44,14 @@ def GetTestPara():
     parser.add_argument('--Resave', type=int, default=0)
     parser.add_argument('--GPUNO', type=int, default=0)
     parser.add_argument('--PredBS', type=int, default=32, help='The batchsize of Predict')
+    parser.add_argument('--TransferL', type=int, default=0, help='Whether transfer learning')
     opt = parser.parse_args()
     return opt
 
 
 def test(opt):
     # check output folder
-    opt.OutputPath = os.path.join(opt.LoadModel, 'test', opt.DataSet)
+    opt.OutputPath = os.path.join(opt.LoadModel, 'test', 'TL'+opt.DataSet)
     DataSetPath = os.path.join(opt.DataSetRoot, opt.DataSet)
     CheckSavePath(opt)
     # setting model parameters
