@@ -6,6 +6,7 @@ import time
 import warnings
 
 import h5py
+import pandas as pd
 import numpy as np
 import segyio
 import torch
@@ -32,13 +33,30 @@ def CheckSavePath(opt):
             os.makedirs(os.path.join(opt.OutputPath, file))
 
 
-def test():
+def GetTestPara():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--DataSet', type=str, default='hade', help='Dataset Root Path')
+    parser.add_argument('--DataSetRoot', type=str, default='E:\\Spectrum', help='Dataset Root Path')
+    parser.add_argument('--EpName', type=str, help='Dataset Root Path')
+    parser.add_argument('--LoadModel', type=str, help='Model Path')
+    parser.add_argument('--OutputPath', type=str, help='Path of Output')
+    parser.add_argument('--Predthre', type=float, default=0.25)
+    parser.add_argument('--Resave', type=int, default=0)
+    parser.add_argument('--GPUNO', type=int, default=0)
+    parser.add_argument('--PredBS', type=int, default=32, help='The batchsize of Predict')
+    opt = parser.parse_args()
+    return opt
+
+
+def test(opt):
     # check output folder
     opt.OutputPath = os.path.join(opt.LoadModel, 'test', opt.DataSet)
+    DataSetPath = os.path.join(opt.DataSetRoot, opt.DataSet)
     CheckSavePath(opt)
     # setting model parameters
-    ParaDict = {para.split('_')[0]: para.split('_')[1] for para in os.path.split(opt.LoadModel)[-1].split('-')}
-    Resize = [int(ParaDict['SH']), int(ParaDict['SW'])]
+    ParaDict = pd.read_csv(os.path.join(opt.LoadModel, 'TrainPara.csv')).to_dict()
+    Resize = [int(ParaDict['SizeH'][0]), int(ParaDict['SizeW'][0])]
+    BadThre = int(200/ParaDict['SeedRate'][0])
 
     ModelPath = os.path.join(opt.LoadModel, 'model', 'Best.pth')
 
@@ -51,18 +69,18 @@ def test():
                 'gth': 'vel.gth.sgy'}
     SegyDict = {}
     for name, path in SegyName.items():
-        SegyDict.setdefault(name, segyio.open(os.path.join(opt.DataSetRoot, 'segy', path), "r", strict=False))
+        SegyDict.setdefault(name, segyio.open(os.path.join(DataSetPath, 'segy', path), "r", strict=False))
     # load h5 file
     H5Name = {'pwr': 'SpecInfo.h5',
               'stk': 'StkInfo.h5',
               'gth': 'GatherInfo.h5'}
     H5Dict = {}
     for name, path in H5Name.items():
-        H5Dict.setdefault(name, h5py.File(os.path.join(opt.DataSetRoot, 'h5File', path), 'r'))
-    opt.t0Int = np.array(SegyDict['pwr'].samples)
+        H5Dict.setdefault(name, h5py.File(os.path.join(DataSetPath, 'h5File', path), 'r'))
+    t0Int = np.array(SegyDict['pwr'].samples)
 
     # load label.npy
-    LabelDict = np.load(os.path.join(opt.DataSetRoot, 't_v_labels.npy'), allow_pickle=True).item()
+    LabelDict = np.load(os.path.join(DataSetPath, 't_v_labels.npy'), allow_pickle=True).item()
     HaveLabelIndex = []
     for lineN in LabelDict.keys():
         for cdpN in LabelDict[lineN].keys():
@@ -73,13 +91,24 @@ def test():
 
     # find common index
     Index = sorted(list((pwr_index & stk_index) & (gth_index & set(HaveLabelIndex))))
-    _, testIndex = train_test_split(Index, test_size=0.2, random_state=123)
-    random.seed(123)
-    # VisualSample = random.sample(testIndex, 16)
+    IndexDict = {}
+    for index in Index:
+        line, cdp = index.split('_')
+        IndexDict.setdefault(int(line), [])
+        IndexDict[int(line)].append(int(cdp))
+    LineIndex = sorted(list(IndexDict.keys()))
+    # use the last 20% for test set
+    LastSplit2 = int(len(LineIndex)*0.8)
+    testLine = LineIndex[LastSplit2:]
+    testIndex = []
+    for line in testLine:
+        for cdp in IndexDict[line]:
+            testIndex.append('%d_%d' % (line, cdp))
+    print(opt.EpName, 'Test Line: ', testLine, '\nTest Number: %d' % len(testIndex))
     
     # build DataLoader
-    dsPred = DLSpec(SegyDict, H5Dict, LabelDict, testIndex, opt.t0Int,
-                    mode='train', GatherLen=int(ParaDict['SGSL']), resize=Resize)
+    dsPred = DLSpec(SegyDict, H5Dict, LabelDict, testIndex, t0Int,
+                    mode='train', GatherLen=int(ParaDict['GatherLen'][0]), resize=Resize)
     dlPred = DataLoader(dsPred,
                         batch_size=opt.PredBS,
                         shuffle=False,
@@ -91,7 +120,7 @@ def test():
     # if have predicted then compute the VMAE result
     if not os.path.exists(os.path.join(opt.OutputPath, '0-PickDict.npy')):
         # Load Predict Network
-        net = MultiInfoNet(opt.t0Int, opt, mode=ParaDict['SGSM'], in_channels=11, resize=Resize)
+        net = MultiInfoNet(t0Int, mode=ParaDict['SGSMode'][0], in_channels=11, resize=Resize)
         if use_gpu:
             net = net.cuda(opt.GPUNO)
         net.eval()
@@ -122,7 +151,7 @@ def test():
                     VInt.append(np.array(SegyDict['pwr'].attributes(segyio.TraceField.offset)[PwrIndex[0]: PwrIndex[1]]))
 
                 # get velocity Picking
-                AP, APPeaks = GetResult(PredSeg.cpu().numpy(), opt.t0Int, VInt, threshold=opt.Predthre)
+                AP, APPeaks = GetResult(PredSeg.cpu().numpy(), t0Int, VInt, threshold=opt.Predthre)
                 # save the picking result
                 for ind, name_single in enumerate(name):
                     FeatureN = {}
@@ -134,7 +163,7 @@ def test():
     else:
         PickDict = np.load(os.path.join(opt.OutputPath, '0-PickDict.npy'), allow_pickle=True).item()
         for name, ResultDict in PickDict.items():
-            AP, APPeaks = GetResult(PickDict[name]['Seg'], opt.t0Int, [PickDict[name]['VInt']], threshold=opt.Predthre)
+            AP, APPeaks = GetResult(PickDict[name]['Seg'], t0Int, [PickDict[name]['VInt']], threshold=opt.Predthre)
             PickDict[name]['APPeaks'] = APPeaks[0]
             PickDict[name]['AP'] = AP[0]
 
@@ -155,10 +184,12 @@ def test():
     print('test mean VMAE: %.3f' % (np.mean(VMAEList)))
     VMAEHist(VMAEList, SavePath=os.path.join(opt.OutputPath, '1-VMAEHist'))
     # get the bad sample index
-    BadSample = [name for name in PickDict.keys() if PickDict[name]['VMAE'] > 10]
+    BadSample = [name for name in PickDict.keys() if PickDict[name]['VMAE'] > BadThre]
 
     # 2 Visual Part Bad Results
-    for name in BadSample:
+    for ind, name in enumerate(BadSample):
+        if ind > 5:
+            break
         ResultDict = PickDict[name]
         print(name, 'VMAE: %.3f' % ResultDict['VMAE'])
         # 2.1 Pwr and Seg Map
@@ -168,7 +199,7 @@ def test():
         # 2.2 Seg with AP and MP 
         PwrIndex = np.array(H5Dict['pwr'][name]['SpecIndex'])
         vVec = np.array(SegyDict['pwr'].attributes(segyio.TraceField.offset)[PwrIndex[0]: PwrIndex[1]])
-        SegPick(ResultDict['Seg'], opt.t0Int, vVec, ResultDict['AP'], ResultDict['MP'], SavePath=os.path.join(opt.OutputPath, 'FigResults', '2-2-SegPick %s' % name))
+        SegPick(ResultDict['Seg'], t0Int, vVec, ResultDict['AP'], ResultDict['MP'], SavePath=os.path.join(opt.OutputPath, 'FigResults', '2-2-SegPick %s' % name))
         # 2.3 CMP gather and NMO result
         GthIndex = np.array(H5Dict['gth'][name]['GatherIndex'])
         Gth = np.array(SegyDict['gth'].trace.raw[GthIndex[0]: GthIndex[1]].T)
@@ -183,17 +214,7 @@ def test():
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--DataSet', type=str, default='hade', help='Dataset Root Path')
-    parser.add_argument('--DataSetRoot', type=str, default='E:\\Spectrum\\hade', help='Dataset Root Path')
-    parser.add_argument('--LoadModel', type=str, default=r'F:\\VSP-MIFN\\0Ablation\DS_hade-SGSL_15-SR_0.80-LR_0.0100-BS_32-SH_256-SW_256-PT_0.10-SGSM_mute-RT_0', help='Model Path')
-    parser.add_argument('--OutputPath', type=str, help='Path of Output')
-    parser.add_argument('--Predthre', type=float, default=0.15)
-    parser.add_argument('--Resave', type=int, default=0)
-    parser.add_argument('--GPUNO', type=int, default=0)
-    parser.add_argument('--PredBS', type=int, default=32, help='The batchsize of Predict')
-    parser.add_argument('--t0Int', type=list, default=[])
-    opt = parser.parse_args()
-
+    # get parameters
+    optN = GetTestPara()
     # start to test
-    test()
+    test(optN)

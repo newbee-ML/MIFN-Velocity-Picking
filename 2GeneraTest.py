@@ -7,10 +7,11 @@ import os
 #################################
 ParaDict = {'DataSet': ['str', ['hade', 'dq8']], 
             'OutputPath': ['str', ['F:\\VelocitySpectrum\\MIFN\\2GeneraTest']], 
-            'SeedRate': ['float', [0.2, 0.3, 0.5, 0.8, 1, ]], 
-            'SizeW': ['int', [256, 128]], 
+            'SeedRate': ['float', [0.2, 0.3, 0.5, 0.8, 1]], 
+            'SizeW': ['int', [128]], 
             'trainBS': ['int', [32]], 
-            'lrStart': ['float', [0.01]]}
+            'lrStart': ['float', [0.01]],
+            'optimizer': ['str', ['sgd']]}
 
 
 #################################
@@ -22,13 +23,14 @@ EpList = ListPara(ParaDict)
 OptDefault = GetTrainPara()
 for ind, EpName in enumerate(EpList):
     try:
+        start = 20 + 1
         # get the ep para dict
         EpDict = ParaStr2Dict(EpName, ParaDict)
-        EpDict.setdefault('EpName', 'Ep-%d' % (ind+1))
+        EpDict.setdefault('EpName', 'Ep-%d' % (ind+start))
         # judge whether done before
-        if os.path.exists(os.path.join(EpDict['OutputPath'], 'Ep-%d' % (ind+1), 'Result.csv')):
+        if os.path.exists(os.path.join(EpDict['OutputPath'], 'Ep-%d' % (ind+start), 'Result.csv')):
             continue
-        if os.path.exists(os.path.join(EpDict['OutputPath'], 'Ep-%d' % (ind+1))):
+        if os.path.exists(os.path.join(EpDict['OutputPath'], 'Ep-%d' % (ind+start))):
             EpDict.setdefault('ReTrain', 0)
         else:
             EpDict.setdefault('ReTrain', 1)

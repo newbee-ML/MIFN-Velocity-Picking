@@ -2,6 +2,7 @@
 The main file for train MIFN
 Author: Hongtao Wang | stolzpi@163.com
 """
+from ast import Raise
 import sys
 import h5py
 import logging
@@ -60,17 +61,17 @@ Get the hyper parameters
 def GetTrainPara():
     parser = argparse.ArgumentParser()
     parser.add_argument('--DataSetRoot', type=str, default='E:\\Spectrum', help='Dataset Root Path')
-    parser.add_argument('--DataSet', type=str, default='hade', help='Dataset Root Path')
-    parser.add_argument('--EpName', type=str, default='Ep-1', help='The index of the experiment')
+    parser.add_argument('--DataSet', type=str, default='dq8', help='Dataset Root Path')
+    parser.add_argument('--EpName', type=str, default='Ep-100', help='The index of the experiment')
     parser.add_argument('--OutputPath', type=str, default='F:\\VelocitySpectrum\\MIFN\\2GeneraTest', help='Path of Output')
     parser.add_argument('--SGSMode', type=str, default='mute')
     parser.add_argument('--GatherLen', type=int, default=15)
     parser.add_argument('--RepeatTime', type=int, default=0)
-    parser.add_argument('--SeedRate', type=float, default=0.8)
+    parser.add_argument('--SeedRate', type=float, default=1)
     parser.add_argument('--ReTrain', type=int, default=1)
     parser.add_argument('--GPUNO', type=int, default=0)
     parser.add_argument('--SizeH', type=int, default=256, help='Size Height')
-    parser.add_argument('--SizeW', type=int, default=256, help='Size Width')
+    parser.add_argument('--SizeW', type=int, default=128, help='Size Width')
     parser.add_argument('--Predthre', type=float, default=0.1)
     parser.add_argument('--MaxIter', type=int, default=10000, help='max iteration')
     parser.add_argument('--SaveIter', type=int, default=100, help='checkpoint each SaveIter')
@@ -225,10 +226,12 @@ def train(opt):
     criterion = nn.BCELoss()
 
     # define the optimizer
-    if opt.optimizer is 'adam':
+    if opt.optimizer == 'adam':
         optimizer = torch.optim.Adam(net.parameters(), lr=lrStart)
-    elif opt.optimizer is 'sgd':
+    elif opt.optimizer == 'sgd':
         optimizer = torch.optim.SGD(net.parameters(), lr=lrStart, momentum=0.9)
+    else:
+        Raise("Error: invalid optimizer") 
 
     # define the lr_scheduler of the optimizer
     scheduler = MultiStepLR(optimizer, [int(10/opt.SeedRate), int(100/opt.SeedRate)], 0.1)
@@ -321,7 +324,6 @@ def train(opt):
                 logger.info('it: %d/%d, epoch: %d, Loss: %.6f, VMAE: %.4f, best valid-Loss: %.6f, best valid-VMAE: %.4f' % (countIter, opt.MaxIter, epoch, LossValid, VMAEValid, BestValidLoss, BestValidVMAE))
             except TypeError:
                 logger.info('it: %d/%d, epoch: %d, TypeError')
-
             net.train()
     # save the finish csv
     ResultDF = pd.DataFrame({'BestValidLoss': [BestValidLoss], 'BestValidVMAE': [BestValidVMAE]})
