@@ -5,7 +5,6 @@ Author: Hongtao Wang | stolzpi@163.com
 from ast import Raise
 import sys
 import h5py
-import logging
 import numpy as np
 import pandas as pd
 import torch
@@ -20,7 +19,7 @@ import torch.nn as nn
 from net.MIFNet import MultiInfoNet
 from torch.utils.data import DataLoader
 from utils.LoadData import DLSpec
-from utils.logger import setup_logger
+from utils.logger import MyLog
 from torch.optim.lr_scheduler import MultiStepLR
 from utils.evaluate import EvaluateValid
 from tensorboardX import SummaryWriter
@@ -61,7 +60,7 @@ Get the hyper parameters
 def GetTrainPara():
     parser = argparse.ArgumentParser()
     parser.add_argument('--DataSetRoot', type=str, default='E:\\Spectrum', help='Dataset Root Path')
-    parser.add_argument('--DataSet', type=str, default='dq8', help='Dataset Root Path')
+    parser.add_argument('--DataSet', type=str, default='hade', help='Dataset Root Path')
     parser.add_argument('--EpName', type=str, default='Ep-100', help='The index of the experiment')
     parser.add_argument('--OutputPath', type=str, default='F:\\VelocitySpectrum\\MIFN\\2GeneraTest', help='Path of Output')
     parser.add_argument('--SGSMode', type=str, default='mute')
@@ -102,8 +101,7 @@ def train(opt):
     writer = SummaryWriter(TBPath)
     BestPath = os.path.join(opt.OutputPath, BaseName, 'model', 'Best.pth')
     LogPath = os.path.join(opt.OutputPath, BaseName, 'log')
-    setup_logger(LogPath)
-    logger = logging.getLogger()
+    logger = MyLog(BaseName, LogPath)
     logger.info('%s start to train ...' % BaseName)
     # save the train parameters to csv
     SaveParameters(opt, BaseName)
@@ -333,6 +331,5 @@ def train(opt):
 if __name__ == '__main__':
     # get hyper parameters
     OptN = GetTrainPara()
-
     # start to train
     train(OptN)

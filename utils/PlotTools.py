@@ -475,22 +475,25 @@ def PwrASeg(Pwr, Seg, SavePath=None):
         plt.show()
     else:
         plt.savefig(SavePath, dpi=100, bbox_inches='tight')
-    plt.close('all')
+    plt.clf()
+    plt.close()
 
 
 # 2.2.1 AP peaks and MP curve
 def InterpResult(APpeaks, MPcurve, SavePath=None):
-    _, ax = plt.subplots(figsize=(2, 10), dpi=90)
-    plt.scatter(APpeaks[:, 1], APpeaks[:, 0], c='r', s=0.3, marker='x', label='AP Peaks')
-    plt.plot(MPcurve[:, 1], MPcurve[:, 0], c='blue', linewidth=0.5, label='MP Curve')
+    _, ax = plt.subplots(figsize=(3, 10), dpi=90)
+    plt.scatter(APpeaks[:, 1], APpeaks[:, 0], c='r', s=2, linewidth=1, marker='x', label='AP Peaks')
+    plt.plot(MPcurve[:, 1], MPcurve[:, 0], c='blue', linewidth=2, label='MP Curve', alpha=0.5)
     plt.xlabel('Velocity (m/s)')
     plt.ylabel('Time (ms)')
+    plt.legend()
     ax.invert_yaxis()
     if SavePath is None:
         plt.show()
     else:
         plt.savefig(SavePath, dpi=100, bbox_inches='tight')
-    plt.close('all')
+    plt.clf()
+    plt.close()
 
 
 # 2.2 Seg with AP and MP 
@@ -505,7 +508,7 @@ def SegPick(Seg, t0Vec, vVec, AP, MP, SavePath=None):
         VCCP = copy.deepcopy(VelC)
         VCCP[:, 0] = (VCCP[:, 0]-t0Vec[0]) / (t0Vec[1]-t0Vec[0])
         VCCP[:, 1] = (VCCP[:, 1]-vVec[0]) / (vVec[1]-vVec[0])
-        plot_curve(VCCP, col[ind], label[ind])   
+        plt.plot(VCCP[:, 1], VCCP[:, 0], c=col[ind], label=label[ind], linewidth=1, alpha=0.5)
     plt.legend()
     plt.imshow(ScaledSeg, aspect='auto', cmap='gray')
     plt.xlabel('Velocity (m/s)')
@@ -515,7 +518,9 @@ def SegPick(Seg, t0Vec, vVec, AP, MP, SavePath=None):
         plt.show()
     else:
         plt.savefig(SavePath, dpi=100, bbox_inches='tight')
-    plt.close('all')
+    plt.clf()
+    plt.close()
+
 
 
 # 2.3 CMP gather and NMO result
@@ -572,3 +577,72 @@ def NetFeatureMap(feature, cmap='gray', SavePath=None):
     else:
         plt.savefig(SavePath, dpi=100, bbox_inches='tight')
     plt.close('all')
+
+
+# 4 visual sampling lines
+def SampleLines(Path=None):
+    LineA = np.array([2240,2280,2320,2360,2400,2440,2480,2520,2560,2600,2640,2680,2720,2760,2800,2840,2880,2920,2960,3000,3040,3080,3120,3160,3200,3240])
+    LineB = np.array([220,250,280,310,340,370,400,430,460,490,520,550,580,610,640,670,700,730,760,790,820,850,880,910,940,970,1000])
+    SeedRate = np.linspace(0.1, 1, 10)
+    # split dataset
+    def Split(LineList, seedrate):
+        LastSplit1, LastSplit2 = int(len(LineList)*0.6), int(len(LineList)*0.8)
+        MedSplit = int(LastSplit1*seedrate)
+        trainLine, validLine, testLine, unuse = LineList[:MedSplit], LineList[LastSplit1: LastSplit2], LineList[LastSplit2:], LineList[MedSplit: LastSplit1]
+        return trainLine, unuse, validLine, testLine
+    # splitting name
+    CategpryName = ['Train Lines', 'Unused Lines', 'Validation Lines', 'Test Lines']
+    ResultSetA = [Split(LineA, SR) for SR in SeedRate]
+    ResultSetB = [Split(LineB, SR) for SR in SeedRate]
+    ResultA = {'%.1f'%SeedRate[ind]:[len(Set[0]),len(Set[1]), len(Set[2]), len(Set[3])] for ind, Set in enumerate(ResultSetA)}
+    ResultB = {'%.1f'%SeedRate[ind]:[len(Set[0]),len(Set[1]), len(Set[2]), len(Set[3])] for ind, Set in enumerate(ResultSetB)}
+    # plot function
+    def survey(results, CategpryName, LineName, path):
+        """
+        Parameters
+        ----------
+        results : dict
+            A mapping from question labels to a list of answers per category.
+            It is assumed all lists contain the same number of entries and that
+            it matches the length of *category_names*.
+        category_names : list of str
+            The category labels.
+        """
+        labels = list(results.keys())
+        data = np.array(list(results.values()))
+        data_cum = data.cumsum(axis=1)
+        category_colors = plt.colormaps['RdYlGn'](
+            np.linspace(0.15, 0.85, data.shape[1]))
+
+        fig, ax = plt.subplots(figsize=(9.2, 5))
+        ax.invert_yaxis()
+        # ax.xaxis.set_visible(False)
+        ax.set_xlim(0, np.sum(data, axis=1).max())
+        ax.set_xlabel('Line Index')
+        ax.set_ylabel('Seed Rate')
+
+        ax.set_xticks(np.arange(len(LineName))+0.5, LineName)
+        for tick in ax.get_xticklabels():
+            tick.set_rotation(55)
+        for i, (colname, color) in enumerate(zip(CategpryName, category_colors)):
+            widths = data[:, i]
+            starts = data_cum[:, i] - widths
+            rects = ax.barh(labels, widths, left=starts, height=0.5,
+                            label=colname, color=color)
+
+            r, g, b, _ = color
+            text_color = 'white' if r * g * b < 0.5 else 'darkgrey'
+            ax.bar_label(rects, label_type='center', color=text_color)
+        ax.legend(ncol=len(CategpryName), bbox_to_anchor=(0, 1),
+                loc='lower left', fontsize='small')
+        if path is None:
+            plt.show()
+        else:
+            plt.savefig(path, dpi=100, bbox_inches='tight')
+        plt.close('all')
+        return fig, ax
+    # data set A 
+    survey(ResultA, CategpryName, LineA, path=os.path.join(Path, 'Dist-A.pdf'))
+    # data set A 
+    survey(ResultB, CategpryName, LineB, path=os.path.join(Path, 'Dist-B.pdf'))
+    

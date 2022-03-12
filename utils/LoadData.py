@@ -1,10 +1,14 @@
+import os
+
 import numpy as np
+import segyio
+import h5py
+import torch
 import torch.utils.data as data
 from scipy import interpolate
 from sklearn.linear_model import LinearRegression
 from torchvision import transforms
-import torch
-import segyio
+
 from utils.SpecEnhanced import spec_enhance
 
 """
@@ -258,3 +262,27 @@ def PredictSingleLoad(DataDict, t0Ind, resize, GatherLen):
     FM = generate_feature_map(DataDict['spectrum'], resize)[np.newaxis, ...]
     stkG, stkC = torch.tensor(stkG[np.newaxis, ...]), torch.tensor(stkC[np.newaxis, ...])
     return FM, stkG, stkC, mask, VMM, ManualCurve
+
+
+# --------- get data dict ------------------
+def GetDataDict(DataSetPath):
+    # load segy data
+    SegyName = {'pwr': 'vel.pwr.sgy',
+                'stk': 'vel.stk.sgy',
+                'gth': 'vel.gth.sgy'}
+    SegyDict = {}
+    for name, path in SegyName.items():
+        SegyDict.setdefault(name, segyio.open(os.path.join(DataSetPath, 'segy', path), "r", strict=False))
+    # load h5 file
+    H5Name = {'pwr': 'SpecInfo.h5',
+              'stk': 'StkInfo.h5',
+              'gth': 'GatherInfo.h5'}
+    H5Dict = {}
+    for name, path in H5Name.items():
+        H5Dict.setdefault(name, h5py.File(os.path.join(DataSetPath, 'h5File', path), 'r'))
+    t0Int = np.array(SegyDict['pwr'].samples)
+
+    # load label.npy
+    LabelDict = np.load(os.path.join(DataSetPath, 't_v_labels.npy'), allow_pickle=True).item()
+
+    return SegyDict, H5Dict, LabelDict

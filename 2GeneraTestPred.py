@@ -6,6 +6,7 @@ Author: Hongtao Wang
 import os
 import pandas as pd
 from test import test, GetTestPara
+
 """
 Get all model path and para path
 """
@@ -16,19 +17,20 @@ def GetModelAPara(RootPath):
         ModelPath = os.path.join(RootPath, file, 'model', 'Best.pth')
         ParaPath = os.path.join(RootPath, file, 'TrainPara.csv')
         if os.path.exists(ModelPath) and os.path.exists(ParaPath):
-            InfoDict.setdefault(file, os.path.join(RootPath, file))
+            if not os.path.exists(os.path.join(RootPath, file, 'test')):
+                InfoDict.setdefault(file, os.path.join(RootPath, file))
     return InfoDict
 
 """
 Test function
 """
-def TestMain(RootPath):
+
+if __name__ == '__main__':
+    RootPath = 'F:\VelocitySpectrum\MIFN\\2GeneraTest'
     TestOpt = GetTestPara()
-    for name, model in GetModelAPara(RootPath).items():
-        print(name)
+    FileList = GetModelAPara(RootPath)
+    for name, model in FileList.items():
+        # ForkNew(parastr)
         TestOpt.EpName = name
         TestOpt.LoadModel = model
         test(TestOpt)
-
-if __name__ == '__main__':
-    TestMain('F:\VelocitySpectrum\MIFN\\2GeneraTest')

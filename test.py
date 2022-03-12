@@ -50,12 +50,16 @@ def GetTestPara():
 
 
 def test(opt):
-    # check output folder
-    opt.OutputPath = os.path.join(opt.LoadModel, 'test', 'TL'+opt.DataSet)
-    DataSetPath = os.path.join(opt.DataSetRoot, opt.DataSet)
-    CheckSavePath(opt)
     # setting model parameters
     ParaDict = pd.read_csv(os.path.join(opt.LoadModel, 'TrainPara.csv')).to_dict()
+    # check output folder
+    opt.DataSet = ParaDict['DataSet'][0]
+    if opt.TransferL:
+        opt.OutputPath = os.path.join(opt.LoadModel, 'test', 'TL-'+opt.DataSet)
+    else:
+        opt.OutputPath = os.path.join(opt.LoadModel, 'test', opt.DataSet)
+    DataSetPath = os.path.join(opt.DataSetRoot, opt.DataSet)
+    CheckSavePath(opt)
     Resize = [int(ParaDict['SizeH'][0]), int(ParaDict['SizeW'][0])]
     BadThre = int(200/ParaDict['SeedRate'][0])
 
@@ -158,8 +162,7 @@ def test(opt):
                     FeatureN = {}
                     for key, featuremaps in feature.items():
                         FeatureN.setdefault(key, featuremaps[ind].squeeze().cpu().numpy())
-                    PickDict.setdefault(name_single, {'AP': AP[ind], 'APPeaks': APPeaks[ind], 'MP': MP[ind].numpy(), 'Pwr': pwr[ind, 0, :].cpu().detach().numpy(), 'Seg': out[ind].cpu().detach().numpy(), 'VInt': VInt[ind], 'Feature': FeatureN})
-
+                    PickDict.setdefault(name_single, {'AP': AP[ind], 'APPeaks': APPeaks[ind], 'MP': MP[ind].numpy(), 'Pwr': pwr[ind, 0, :].cpu().detach().numpy(), 'Seg': out[ind].cpu().detach().numpy(), 'Tint': t0Int, 'VInt': VInt[ind], 'Feature': FeatureN})
                 bar.update(1)
     else:
         PickDict = np.load(os.path.join(opt.OutputPath, '0-PickDict.npy'), allow_pickle=True).item()
@@ -189,8 +192,7 @@ def test(opt):
 
     # 2 Visual Part Bad Results
     for ind, name in enumerate(BadSample):
-        if ind > 5:
-            break
+        break
         ResultDict = PickDict[name]
         print(name, 'VMAE: %.3f' % ResultDict['VMAE'])
         # 2.1 Pwr and Seg Map
@@ -217,5 +219,6 @@ def test(opt):
 if __name__ == '__main__':
     # get parameters
     optN = GetTestPara()
+    optN.__dict__['LoadModel'] = 'F:\VelocitySpectrum\MIFN\\2GeneraTest\Ep-31'
     # start to test
     test(optN)

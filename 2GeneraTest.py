@@ -5,9 +5,9 @@ import os
 #################################
 # experiment setting
 #################################
-ParaDict = {'DataSet': ['str', ['hade', 'dq8']], 
+ParaDict = {'DataSet': ['str', ['hade']], 
             'OutputPath': ['str', ['F:\\VelocitySpectrum\\MIFN\\2GeneraTest']], 
-            'SeedRate': ['float', [0.1, 0.4, 0.6, 0.7, 0.9]], 
+            'SeedRate': ['float', [0.4, 0.6, 0.9, 1]], 
             'SizeW': ['int', [128]], 
             'trainBS': ['int', [32]], 
             'lrStart': ['float', [0.01]],
@@ -23,7 +23,7 @@ EpList = ListPara(ParaDict)
 OptDefault = GetTrainPara()
 for ind, EpName in enumerate(EpList):
     try:
-        start = 30 + 1
+        start = 51 + 1
         # get the ep para dict
         EpDict = ParaStr2Dict(EpName, ParaDict)
         EpDict.setdefault('EpName', 'Ep-%d' % (ind+start))
