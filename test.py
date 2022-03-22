@@ -14,6 +14,7 @@ from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
+from net.AblationNet import MixNet
 from net.MIFNet import MultiInfoNet
 from utils.evaluate import GetResult
 from utils.LoadData import DLSpec
@@ -35,11 +36,12 @@ def CheckSavePath(opt):
 
 def GetTestPara():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--DataSet', type=str, default='hade', help='Dataset Root Path')
+    parser.add_argument('--DataSet', type=str, help='Dataset Root Path')
     parser.add_argument('--DataSetRoot', type=str, default='E:\\Spectrum', help='Dataset Root Path')
     parser.add_argument('--EpName', type=str, help='Dataset Root Path')
     parser.add_argument('--LoadModel', type=str, help='Model Path')
     parser.add_argument('--OutputPath', type=str, help='Path of Output')
+    parser.add_argument('--PostProcessing', type=int, default=1, help='post-processing method')
     parser.add_argument('--Predthre', type=float, default=0.25)
     parser.add_argument('--Resave', type=int, default=0)
     parser.add_argument('--GPUNO', type=int, default=0)
@@ -53,7 +55,8 @@ def test(opt):
     # setting model parameters
     ParaDict = pd.read_csv(os.path.join(opt.LoadModel, 'TrainPara.csv')).to_dict()
     # check output folder
-    opt.DataSet = ParaDict['DataSet'][0]
+    if opt.DataSet is None:
+        opt.DataSet = ParaDict['DataSet'][0]
     if opt.TransferL:
         opt.OutputPath = os.path.join(opt.LoadModel, 'test', 'TL-'+opt.DataSet)
     else:
@@ -125,7 +128,10 @@ def test(opt):
     # if have predicted then compute the VMAE result
     if not os.path.exists(os.path.join(opt.OutputPath, '0-PickDict.npy')):
         # Load Predict Network
-        net = MultiInfoNet(t0Int, mode=ParaDict['SGSMode'][0], in_channels=11, resize=Resize)
+        try:
+            net = MixNet(t0Int, NetType=ParaDict['NetType'][0], mode=ParaDict['SGSMode'][0], resize=Resize)
+        except:
+            net = MultiInfoNet(t0Int, mode=ParaDict['SGSMode'][0], in_channels=11, resize=Resize)
         if use_gpu:
             net = net.cuda(opt.GPUNO)
         net.eval()
@@ -156,7 +162,7 @@ def test(opt):
                     VInt.append(np.array(SegyDict['pwr'].attributes(segyio.TraceField.offset)[PwrIndex[0]: PwrIndex[1]]))
 
                 # get velocity Picking
-                AP, APPeaks = GetResult(PredSeg.cpu().numpy(), t0Int, VInt, threshold=opt.Predthre)
+                AP, APPeaks = GetResult(PredSeg.cpu().numpy(), t0Int, VInt, threshold=opt.Predthre, PostProcessing=opt.PostProcessing)
                 # save the picking result
                 for ind, name_single in enumerate(name):
                     FeatureN = {}
@@ -167,7 +173,7 @@ def test(opt):
     else:
         PickDict = np.load(os.path.join(opt.OutputPath, '0-PickDict.npy'), allow_pickle=True).item()
         for name, ResultDict in PickDict.items():
-            AP, APPeaks = GetResult(PickDict[name]['Seg'], t0Int, [PickDict[name]['VInt']], threshold=opt.Predthre)
+            AP, APPeaks = GetResult(PickDict[name]['Seg'], t0Int, [PickDict[name]['VInt']], threshold=opt.Predthre, PostProcessing=opt.PostProcessing)
             PickDict[name]['APPeaks'] = APPeaks[0]
             PickDict[name]['AP'] = AP[0]
 

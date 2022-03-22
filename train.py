@@ -16,7 +16,7 @@ import shutil
 import warnings
 import argparse
 import torch.nn as nn
-from net.MIFNet import MultiInfoNet
+from net.AblationNet import MixNet
 from torch.utils.data import DataLoader
 from utils.LoadData import DLSpec
 from utils.logger import MyLog
@@ -64,6 +64,7 @@ def GetTrainPara():
     parser.add_argument('--EpName', type=str, default='Ep-100', help='The index of the experiment')
     parser.add_argument('--OutputPath', type=str, default='F:\\VelocitySpectrum\\MIFN\\2GeneraTest', help='Path of Output')
     parser.add_argument('--SGSMode', type=str, default='mute')
+    parser.add_argument('--NetType', type=str, default='all')
     parser.add_argument('--GatherLen', type=int, default=15)
     parser.add_argument('--RepeatTime', type=int, default=0)
     parser.add_argument('--SeedRate', type=float, default=1)
@@ -73,8 +74,8 @@ def GetTrainPara():
     parser.add_argument('--SizeW', type=int, default=128, help='Size Width')
     parser.add_argument('--Predthre', type=float, default=0.1)
     parser.add_argument('--MaxIter', type=int, default=10000, help='max iteration')
-    parser.add_argument('--SaveIter', type=int, default=100, help='checkpoint each SaveIter')
-    parser.add_argument('--MsgIter', type=int, default=20, help='log the loss each MsgIter')
+    parser.add_argument('--SaveIter', type=int, default=30, help='checkpoint each SaveIter')
+    parser.add_argument('--MsgIter', type=int, default=2, help='log the loss each MsgIter')
     parser.add_argument('--lrStart', type=float, default=0.001, help='the beginning learning rate')
     parser.add_argument('--optimizer', type=str, default='adam', help=r"the optimizer of training, 'adam' or 'sgd'")
     parser.add_argument('--PretrainModel', type=str, help='The path of pretrain model to train (Path)')
@@ -164,7 +165,7 @@ def train(opt):
     random.seed(123)
     VisualSample = random.sample(trainIndex, 16)
     print('Train Num %d, Valid Num %d' % (len(trainIndex), len(validIndex)))
-
+    return 0
     ##################################
     # build the data loader
     ##################################
@@ -179,12 +180,12 @@ def train(opt):
                     shuffle=True,
                     num_workers=0,
                     pin_memory=False,
-                    drop_last=True)
+                    drop_last=False)
     dlval = DataLoader(dsval,
                        batch_size=opt.valBS,
                        shuffle=False,
                        num_workers=0,
-                       drop_last=True)
+                       drop_last=False)
 
     ###################################
     # load the network
@@ -197,7 +198,7 @@ def train(opt):
         device = 'cpu'
 
     # load network
-    net = MultiInfoNet(t0Int, in_channels=11, resize=resize, mode=opt.SGSMode, device=device)
+    net = MixNet(t0Int, NetType=opt.NetType, resize=resize, mode=opt.SGSMode, device=device)
     if device is not 'cpu':
         net = net.cuda(device)
     net.train()
@@ -232,7 +233,7 @@ def train(opt):
         Raise("Error: invalid optimizer") 
 
     # define the lr_scheduler of the optimizer
-    scheduler = MultiStepLR(optimizer, [int(10/opt.SeedRate), int(100/opt.SeedRate)], 0.1)
+    scheduler = MultiStepLR(optimizer, [1000000], 0.1)
     
     ####################################
     # training iteration 
@@ -243,7 +244,7 @@ def train(opt):
 
     # start the iteration
     diter = iter(dl)
-    for it in range(opt.MaxIter):
+    for _ in range(opt.MaxIter):
         if countIter % len(dl) == 0 and countIter > 0:
             epoch += 1
             scheduler.step()
@@ -313,8 +314,8 @@ def train(opt):
                 # reload checkpoint pth
                 if os.path.exists(BestPath):
                     net.load_state_dict(torch.load(BestPath)['Weights'])
-                # if do not decreate for 5 times then early stop
-                if EarlyStopCount > 5:
+                # if do not decreate for 10 times then early stop
+                if EarlyStopCount > 10:
                     break
             
             # write the valid log

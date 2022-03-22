@@ -1,6 +1,7 @@
 import numpy as np
 from scipy import interpolate
 from sklearn import linear_model
+from utils.LoadData import interpolation
 
 """
 Past-processing for segmentation map
@@ -25,7 +26,7 @@ def scale_change(x, y, x_ind, y_ind, method):
     else:
         print('error type input!')
 
-def GetResult(SegMat, t0Ind, vInd, threshold=0.1):
+def GetResult(SegMat, t0Ind, vInd, threshold=0.1, PostProcessing=1):
     # 1 get the high probability points 
     Peaks = np.array([GetHighProb(SegMap, threshold) for SegMap in SegMat])
 
@@ -42,7 +43,10 @@ def GetResult(SegMat, t0Ind, vInd, threshold=0.1):
     FinalPeaks = ScaledPeaks
 
     # 4 interpolate & regression
-    Curve = np.array([interpolation2(FinalPeak, t0Ind, vInd[ind], RefRange=300) for ind, FinalPeak in enumerate(FinalPeaks)])
+    if PostProcessing:
+        Curve = np.array([interpolation2(FinalPeak, t0Ind, vInd[ind], RefRange=300) for ind, FinalPeak in enumerate(FinalPeaks)])
+    else:
+        Curve = np.array([interpolation(FinalPeak, t0Ind, vInd[ind]) for ind, FinalPeak in enumerate(FinalPeaks)])
 
     # # 5 Get the key points
     # ResModel = KeyPoints(Curve)

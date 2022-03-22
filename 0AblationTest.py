@@ -1,5 +1,5 @@
 """
-Predict the test data set for different seed rates
+Predict the test data set for ablation study
 
 Author: Hongtao Wang
 """
@@ -27,7 +27,7 @@ Test function
 """
 
 if __name__ == '__main__':
-    RootPath = 'F:\VelocitySpectrum\MIFN\\2GeneraTest'
+    RootPath = 'F:\\VelocitySpectrum\\MIFN\\0Ablation'
     TestOpt = GetTestPara()
     FileList = GetModelAPara(RootPath)
     for name, model in FileList.items():
@@ -35,4 +35,6 @@ if __name__ == '__main__':
         TestOpt.EpName = name
         TestOpt.LoadModel = model
         TestOpt.Predthre = 0.2
+        if int(name.split('-')[1]) in [203, 213]:
+            TestOpt.PostProcessing = 0
         test(TestOpt)

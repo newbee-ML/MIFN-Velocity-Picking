@@ -14,6 +14,7 @@ from tqdm import tqdm
 ############################################
 def SummaryValidResults(opt):
     FolderList = [file for file in os.listdir(opt.LoadRoot) if file.split('-')[0] == 'Ep']
+    FolderList = [file for file in FolderList if int(file.split('-')[1])>=StratEp]
     Result, ColName = [], None
     for ind, file in enumerate(FolderList):
         FolderPath = os.path.join(opt.LoadRoot, file)
@@ -37,6 +38,7 @@ def SummaryValidResults(opt):
 ###############################################
 def SummaryTestResults(opt):
     FolderList = [file for file in os.listdir(opt.LoadRoot) if file.split('-')[0] == 'Ep']
+    FolderList = [file for file in FolderList if int(file.split('-')[1])>=StratEp]
     Result, ColName = [], None
     for ind, file in enumerate(FolderList):
         FolderPath = os.path.join(opt.LoadRoot, file)
@@ -132,14 +134,65 @@ def VisualResults(opt):
         bar.close()
 
 
+################################################################
+# Plot train and test loss curve
+################################################################
+def PlotLossCurve(EpList, RootPath):
+    LossDict = {}
+    # --------- load data from log file ----------
+    for Ep in EpList:
+        # load model parameters
+        ParaDict = pd.read_csv(os.path.join(RootPath, Ep, 'TrainPara.csv')).to_dict()
+        DataSet, SR = ParaDict['DataSet'][0], ParaDict['SeedRate'][0]
+        LossDict.setdefault(DataSet, {})
+        LossDict[DataSet].setdefault(SR, {})
+        # load log file
+        LogRootPath = os.path.join(RootPath, Ep, 'log')
+        LogPath = os.path.join(LogRootPath, os.listdir(LogRootPath)[0])
+        LogFile = open(LogPath, 'r')
+        LogRows =  LogFile.readlines()
+        # split the details
+        for row in LogRows:
+            if 'train-loss' in row:
+                it = int(row.split('it: ')[1].split('/')[0])
+                TrainLoss = float(row.split('train-loss: ')[1].strip('\n'))
+                LossDict[DataSet][SR].setdefault('train', [])
+                LossDict[DataSet][SR]['train'].append([it, TrainLoss])
+            elif 'valid-Loss' in row:
+                it = int(row.split('it: ')[1].split('/')[0])
+                ValidLoss = float(row.split('Loss: ')[1].split(',')[0])
+                LossDict[DataSet][SR].setdefault('valid', [])
+                LossDict[DataSet][SR]['valid'].append([it, ValidLoss])
+    # -------- plot the loss curve --------
+    for data, loss_dict in LossDict.items():
+        PlotLoss(loss_dict, os.path.join(RootPath, 'LossCurve-%s.pdf' % data))
+
+
+########################################################################
+# plot the VMAE of test results
+########################################################################
+def PlotTestVMAE(RootPath):
+    TestCsv = pd.read_excel(os.path.join(RootPath, 'TestResult.xlsx'))
+    TestData = TestCsv.groupby('DataSet')
+    TestDict = {}
+    for data, df in TestData:
+        TestDict.setdefault(data, df[['SeedRate', 'TestVMAE']].values)
+    VMAETest(TestDict, os.path.join(RootPath, 'VMAETest.pdf'))
+    
+
+
 
 if __name__ == "__main__":
-    # visual sample result
-    # SampleLines(os.path.join('F:\VelocitySpectrum\MIFN\\2GeneraTest'))
+    StratEp = 140
+    EpList = ['Ep-%d'%ind for ind in [203, 146, 223, 144, 213, 142, 141, 140]]
     parser = argparse.ArgumentParser()
     parser.add_argument('--LoadRoot', type=str, default='F:\\VelocitySpectrum\\MIFN\\2GeneraTest', help='EP path')
     optN = parser.parse_args()
-    SummaryValidResults(optN)
-    SummaryTestResults(optN)
+    # visual sample result
+    # SampleLines(optN.LoadRoot)
+    # SummaryValidResults(optN)
+    # SummaryTestResults(optN)
     # VisualResults(optN)
+    PlotLossCurve(EpList, optN.LoadRoot)
+    PlotTestVMAE(optN.LoadRoot)
     

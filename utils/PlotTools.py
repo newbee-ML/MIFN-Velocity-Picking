@@ -30,7 +30,7 @@ def set_axis(x_dim, y_dim, interval=50):
 
 
 # Plot CMP gather and NMO CMP gather
-def plot_cmp(cmp_data, t_vec, o_vec, save_path='xxx', if_add=1):
+def plot_cmp(cmp_data, t_vec, o_vec, save_path='xxx', if_add=1, ShowY=False):
     center_single = np.linspace(np.min(o_vec), np.max(o_vec), cmp_data.shape[1])
     o_d = center_single[1] - center_single[0]
     cmp_data_copy = copy.deepcopy(cmp_data)
@@ -58,8 +58,11 @@ def plot_cmp(cmp_data, t_vec, o_vec, save_path='xxx', if_add=1):
         for i in range(cmp_data.shape[1]):
             ax1.fill_betweenx(t_vec, center_single[i], center_single[i] + 2 * cmp_data_copy[:, i], facecolor='black')
         # ax1.set_title(title)
-        ax1.set_xlabel('Offset (m)')
-        ax1.set_ylabel('Time (ms)')
+        if ShowY:
+            ax1.set_ylabel('Time (ms)', fontsize=15)
+        else:
+            ax1.set_yticks([])
+        ax1.set_xlabel('Offset (m)', fontsize=15)
         ax1.set_xlim(min(o_vec), max(o_vec))
         ax1.set_ylim(min(t_vec), max(t_vec))
         ax1.invert_yaxis()
@@ -74,25 +77,24 @@ def plot_cmp(cmp_data, t_vec, o_vec, save_path='xxx', if_add=1):
         for i in range(cmp_data.shape[1]):
             ax.fill_betweenx(t_vec, center_single[i], center_single[i] + 2 * cmp_data_copy[:, i], facecolor='black')
         # ax.set_title(title)
-        ax.set_xlabel('Offset (m)')
-        ax.set_ylabel('Time (ms)')
+        ax.set_xlabel('Offset (m)', fontsize=15)
+        ax.set_ylabel('Time (ms)', fontsize=15)
         ax.set_xlim(min(o_vec), max(o_vec))
         ax.set_ylim(min(t_vec), max(t_vec))
         ax.invert_yaxis()
-
-    plt.savefig(save_path, dpi=300, bbox_inches='tight')
+    plt.savefig(save_path, dpi=200, bbox_inches='tight')
     plt.close()
 
 
 # Plot spectrum
-def plot_spectrum(spectrum, t0_vec, v_vec, save_path=None, VelCurve=None):
+def plot_spectrum(spectrum, t0_vec, v_vec, cmap='seismic', save_path=None, ShowY=False, VelCurve=None):
+    spectrum = np.squeeze(spectrum)
     if len(t0_vec) != spectrum.shape[0]:
         t0_vec = np.linspace(t0_vec[0], t0_vec[-1], spectrum.shape[0])
     if len(v_vec) != spectrum.shape[1]:
         v_vec = np.linspace(v_vec[0], v_vec[-1], spectrum.shape[1])
-    origin_pwr = 255 - (spectrum - np.min(spectrum)) / (np.max(spectrum) - np.min(spectrum)) * 255
+    origin_pwr = (spectrum - np.min(spectrum)) / (np.max(spectrum) - np.min(spectrum)) * 255
     data_plot = origin_pwr.astype(np.uint8).squeeze()
-    data_plot_hot = cv2.applyColorMap(data_plot, cv2.COLORMAP_JET)  # COLORMAP_JET COLORMAP_HOT
     plt.figure(figsize=(2, 10), dpi=300)
     if VelCurve is not None:
         label = ['Auto Velocity', 'Manual Velocity']
@@ -103,10 +105,13 @@ def plot_spectrum(spectrum, t0_vec, v_vec, save_path=None, VelCurve=None):
             VCCP[:, 1] = (VCCP[:, 1]-v_vec[0]) / (v_vec[1]-v_vec[0])
             plot_curve(VCCP, col[ind], label[ind])   
         plt.legend()
-    plt.imshow(data_plot_hot, aspect='auto')
-    plt.xlabel('Velocity (m/s)')
+    plt.imshow(data_plot, cmap=cmap, aspect='auto')
+    plt.xlabel('Velocity (m/s)', fontsize=15)
     set_axis(v_vec, t0_vec)
-    plt.ylabel('Time (ms)')
+    if ShowY:
+        plt.ylabel('Time (ms)', fontsize=15)
+    else:
+        plt.yticks([])
     if save_path is None:
         plt.show()
     else:
@@ -312,7 +317,7 @@ def PlotSPDistributions(AllIndex, SPIndex, save_path='xxx'):
 
 # Plot Velocity Field
 def PlotVelField(VelField, cdpList, tInd, vInd, LineName, save_path):
-    plt.figure(figsize=(20, 10), dpi=300)
+    plt.figure(figsize=(20, 10), dpi=100)
     cdpShow = [''] * len(cdpList)
     tshow = [''] * len(tInd)
     cdpInd = np.linspace(0, len(cdpList)-1, num=20).astype(np.int)
@@ -323,19 +328,15 @@ def PlotVelField(VelField, cdpList, tInd, vInd, LineName, save_path):
         cdpShow[i] = cdpList[i]
 
     # heatmap
-    h = sns.heatmap(data=VelField, cmap='jet', linewidths=0, annot=False, cbar=False,
-                    vmax=vInd[-1], vmin=vInd[0], xticklabels=cdpShow, yticklabels=tshow,
-                    cbar_kws={'label': 'Velocity (m/s)'})
+    h = sns.heatmap(data=VelField, cmap='jet', linewidths=0, annot=False, cbar=False, vmax=vInd[-1], vmin=vInd[0], xticklabels=cdpShow, yticklabels=tshow,cbar_kws={'label': 'Velocity (m/s)'})
 
     # color bar
     cb = h.figure.colorbar(h.collections[0])
     cb.ax.tick_params(labelsize=15)
-
-    plt.title('Line %s Velocity Field' % LineName, fontsize=25)
     plt.xlabel('CDP', fontsize=20)
     plt.ylabel('t0', fontsize=20)
     plt.tight_layout()
-    plt.savefig(save_path, dpi=1000, bbox_inches='tight')
+    plt.savefig(save_path, dpi=100, bbox_inches='tight')
     plt.close('all')
 
 
@@ -352,8 +353,8 @@ def PlotStkGather(gather_data, t_ind, group_ind, save_path='xxx'):
 
     # scale the amplitude of cmp_data to range (-0.5*d, 0.5*d)
     pos_ptp, neg_ptp = np.ptp(cmp_data_pos, axis=0), np.ptp(cmp_data_neg, axis=0)
-    cmp_data_pos = cmp_data_pos / pos_ptp * o_d * 2
-    cmp_data_neg = cmp_data_neg / neg_ptp * o_d * 2
+    cmp_data_pos = cmp_data_pos / pos_ptp * o_d * 0.5
+    cmp_data_neg = cmp_data_neg / neg_ptp * o_d * 0.5
 
     # plot cmp trace
     fig, ax = plt.subplots(figsize=(20, 10), dpi=90)
@@ -365,8 +366,8 @@ def PlotStkGather(gather_data, t_ind, group_ind, save_path='xxx'):
         ax.fill_betweenx(t_ind, center_single[i], center_single[i] + cmp_data_pos[:, i], facecolor='black')
     ax.set_xlim(min(group_ind), max(group_ind))
     ax.set_ylim(min(t_ind), max(t_ind))
-    ax.set_xlabel('index')
-    ax.set_ylabel('time (ms)')
+    ax.set_xlabel('index', fontsize=15)
+    ax.set_ylabel('time (ms)', fontsize=15)
 
     ax.invert_yaxis()
     plt.savefig(save_path, dpi=100, bbox_inches='tight')
@@ -480,13 +481,18 @@ def PwrASeg(Pwr, Seg, SavePath=None):
 
 
 # 2.2.1 AP peaks and MP curve
-def InterpResult(APpeaks, MPcurve, SavePath=None):
-    _, ax = plt.subplots(figsize=(3, 10), dpi=90)
-    plt.scatter(APpeaks[:, 1], APpeaks[:, 0], c='r', s=2, linewidth=1, marker='x', label='AP Peaks')
-    plt.plot(MPcurve[:, 1], MPcurve[:, 0], c='blue', linewidth=2, label='MP Curve', alpha=0.5)
-    plt.xlabel('Velocity (m/s)')
-    plt.ylabel('Time (ms)')
-    plt.legend()
+def InterpResult(APpeaks, MPcurve, tInd, VInd, SavePath=None, ShowY=True):
+    _, ax = plt.subplots(figsize=(2, 10), dpi=90)
+    plt.scatter(APpeaks[:, 1], APpeaks[:, 0], c='r', s=7, linewidth=1, marker='x', label='AP Peaks')
+    plt.plot(MPcurve[:, 1], MPcurve[:, 0], c='blue', linewidth=5, label='MP Curve', alpha=0.3)
+    plt.xlabel('Velocity (m/s)', fontsize=15)
+    if ShowY:
+        plt.ylabel('Time (ms)', fontsize=15)
+    else:
+        plt.yticks([])
+    plt.legend(loc=1, fontsize=11)
+    plt.xlim(np.min(VInd), np.max(VInd))
+    plt.ylim(np.min(tInd), np.max(tInd))
     ax.invert_yaxis()
     if SavePath is None:
         plt.show()
@@ -583,7 +589,7 @@ def NetFeatureMap(feature, cmap='gray', SavePath=None):
 def SampleLines(Path=None):
     LineA = np.array([2240,2280,2320,2360,2400,2440,2480,2520,2560,2600,2640,2680,2720,2760,2800,2840,2880,2920,2960,3000,3040,3080,3120,3160,3200,3240])
     LineB = np.array([220,250,280,310,340,370,400,430,460,490,520,550,580,610,640,670,700,730,760,790,820,850,880,910,940,970,1000])
-    SeedRate = np.linspace(0.1, 1, 10)
+    SeedRate = [0.2, 0.5, 0.8, 1]
     # split dataset
     def Split(LineList, seedrate):
         LastSplit1, LastSplit2 = int(len(LineList)*0.6), int(len(LineList)*0.8)
@@ -614,12 +620,12 @@ def SampleLines(Path=None):
         category_colors = plt.colormaps['RdYlGn'](
             np.linspace(0.15, 0.85, data.shape[1]))
 
-        fig, ax = plt.subplots(figsize=(9.2, 5))
+        fig, ax = plt.subplots(figsize=(9.2, 3))
         ax.invert_yaxis()
         # ax.xaxis.set_visible(False)
         ax.set_xlim(0, np.sum(data, axis=1).max())
-        ax.set_xlabel('Line Index')
-        ax.set_ylabel('Seed Rate')
+        ax.set_xlabel('Line Index', fontsize=20)
+        ax.set_ylabel('Sampling Rate', fontsize=20)
 
         ax.set_xticks(np.arange(len(LineName))+0.5, LineName)
         for tick in ax.get_xticklabels():
@@ -634,7 +640,7 @@ def SampleLines(Path=None):
             text_color = 'white' if r * g * b < 0.5 else 'darkgrey'
             ax.bar_label(rects, label_type='center', color=text_color)
         ax.legend(ncol=len(CategpryName), bbox_to_anchor=(0, 1),
-                loc='lower left', fontsize='small')
+                loc='lower left', fontsize=11)
         if path is None:
             plt.show()
         else:
@@ -645,4 +651,89 @@ def SampleLines(Path=None):
     survey(ResultA, CategpryName, LineA, path=os.path.join(Path, 'Dist-A.pdf'))
     # data set A 
     survey(ResultB, CategpryName, LineB, path=os.path.join(Path, 'Dist-B.pdf'))
-    
+
+
+# 5 plot the loss curve of train and valid
+def PlotLoss(LossDict, SavePath=None):
+    Colors = plt.colormaps['RdYlGn'](np.linspace(0.15, 0.85, len(list(LossDict.keys()))))
+    fig, ax = plt.subplots(figsize=(3, 3))
+    for ind, (sr, loss_dict) in enumerate(LossDict.items()):
+        TC, VC = np.array(loss_dict['train']), np.array(loss_dict['valid'])
+        ax.plot(TC[:, 0], TC[:, 1], c=Colors[ind], label='SR=%.1f-train'%sr, alpha=0.5, linewidth=1)
+        ax.plot(VC[:, 0], VC[:, 1], '*', markersize=3, c=Colors[ind], label='SR=%.1f-valid'%sr, alpha=0.5)
+    # ax.set_xscale('log', base=2)
+    ax.set_yscale('log', base=2)
+    ax.set_xlabel('Iteration', fontsize=12)
+    ax.set_ylabel('Loss', fontsize=12)
+    ax.grid(True)
+    plt.legend(loc=1, fontsize=7)
+    if SavePath is None:
+        plt.show()
+    else:
+        plt.savefig(SavePath, dpi=100, bbox_inches='tight')
+    plt.close('all')
+
+
+# 6 plot the VMAE results of the test results
+def VMAETest(TestDict, SavePath=None):
+    Colors = plt.colormaps['RdYlGn'](np.linspace(0.15, 0.85, len(list(TestDict.keys()))))
+    fig, ax = plt.subplots(figsize=(3, 3))
+    label = ['B', 'A']
+    for ind, (_, array) in enumerate(TestDict.items()):
+        ax.plot(array[:, 0], array[:, 1], marker='o', c=Colors[ind], label='Dataset %s'%label[ind], markersize=7, alpha=0.7, markerfacecolor='blue')
+        for a, b in zip(array[:, 0], array[:, 1]):
+            ax.text(a, b+0.8, '%.2f'%b, ha='center', va='bottom', fontsize=8)
+    plt.legend(fontsize=10)
+    ax.set_xlabel('Sampling Rate', fontsize=12)
+    ax.set_ylabel('VMAE (m/s)', fontsize=12)
+    ax.set_xlim((0.1, 1.15))
+    ax.set_ylim((10, 32))
+    if SavePath is None:
+        plt.show()
+    else:
+        plt.savefig(SavePath, dpi=100, bbox_inches='tight')
+    plt.close('all')
+
+
+def SGSMap(Map, t0_vec, v_vec, cmap='seismic', save_path=None):
+    Map = np.squeeze(Map)
+    if len(t0_vec) != Map.shape[0]:
+        t0_vec = np.linspace(t0_vec[0], t0_vec[-1], Map.shape[0])
+    if len(v_vec) != Map.shape[1]:
+        v_vec = np.linspace(v_vec[0], v_vec[-1], Map.shape[1])
+    plt.figure(figsize=(2, 10), dpi=100)
+    # heatmap
+    h = sns.heatmap(data=Map, cmap=cmap, linewidths=0, annot=False, cbar=False)
+    plt.xlabel('Velocity (m/s)', fontsize=15)
+    plt.ylabel('Time (ms)', fontsize=15)
+    # color bar
+    cb = h.figure.colorbar(h.collections[0])
+    cb.ax.tick_params(labelsize=5)
+    set_axis(t0_vec, v_vec, interval=60)
+    if save_path is None:
+        plt.show()
+    else:
+        plt.savefig(save_path, dpi=100, bbox_inches='tight')
+    plt.close('all')
+
+
+def StkNMOCMP(Map, tInd, CdpList, cmap='gray', save_path=None):
+    Map = np.squeeze(Map)
+    if len(tInd) != Map.shape[0]:
+        tInd = np.linspace(tInd[0], tInd[-1], Map.shape[0])
+    if len(CdpList) != Map.shape[1]:
+        CdpList = np.linspace(CdpList[0], CdpList[-1], Map.shape[1])
+    ScaleMap = (Map - np.min(Map)) / (np.max(Map) - np.min(Map)) * 255
+    ScaleMap = ScaleMap.astype(np.uint8).squeeze()
+    plt.figure(figsize=(5, 5), dpi=100)
+    plt.imshow(ScaleMap, cmap=cmap, aspect='auto')
+    plt.xlabel('Cdp Index', fontsize=12)
+    plt.ylabel('Time (ms)', fontsize=12)
+    # set_axis(tInd, CdpList, interval=50)
+    if save_path is None:
+        plt.show()
+    else:
+        plt.savefig(save_path, dpi=100, bbox_inches='tight')
+    plt.close('all')
+
+

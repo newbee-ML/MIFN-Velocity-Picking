@@ -17,6 +17,7 @@ from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
+from net.AblationNet import MixNet
 from net.MIFNet import MultiInfoNet
 from utils.evaluate import GetResult
 from utils.LoadData import DLSpec
@@ -24,14 +25,6 @@ from utils.PastProcess import NMOCorr, interpolation2
 from utils.PlotTools import *
 
 warnings.filterwarnings("ignore")
-
-
-def CheckSavePath(opt):
-    if opt.Resave:
-        if os.path.exists(opt.OutputPath):
-            shutil.rmtree(opt.OutputPath)
-    if not os.path.exists(opt.OutputPath):
-        os.makedirs(opt.OutputPath)
 
 
 ###########################################################
@@ -44,6 +37,7 @@ def GetPredictPara():
     parser.add_argument('--OutputPath', type=str, help='Path of Output')
     parser.add_argument('--GPUNO', type=int, default=0)
     parser.add_argument('--PredBS', type=int, default=64, help='The batchsize of Predict')
+    parser.add_argument('--PredLine', type=int, help='The batchsize of Predict')
     opt = parser.parse_args()
     return opt
 
@@ -58,7 +52,8 @@ def predict(opt):
     DataSet = ParaDict['DataSet'][0]
     OutputPath = os.path.join(opt.LoadModel, 'predict', DataSet)
     DataSetPath = os.path.join(opt.DataSetRoot, DataSet)
-    CheckSavePath(opt)
+    if not os.path.exists(OutputPath):
+        os.makedirs(OutputPath)
     
     Resize = [int(ParaDict['SizeH'][0]), int(ParaDict['SizeW'][0])]
     ModelPath = os.path.join(opt.LoadModel, 'model', 'Best.pth')
@@ -93,11 +88,12 @@ def predict(opt):
     gth_index = set(H5Dict['gth'].keys())
 
     # find common index
-    Index = sorted(list((pwr_index & stk_index) & (gth_index & set(HaveLabelIndex))))
-    
+    Index = sorted(list((pwr_index & stk_index) & gth_index))
+    if opt.PredLine is not None:
+        Index = [index for index in Index if int(index.split('_')[0]) == opt.PredLine]
     # build DataLoader
     dsPred = DLSpec(SegyDict, H5Dict, LabelDict, Index, t0Int,
-                    mode='predict', GatherLen=int(ParaDict['SGSL']), resize=Resize)
+                    mode='predict', GatherLen=int(ParaDict['GatherLen'][0]), resize=Resize)
     dlPred = DataLoader(dsPred,
                         batch_size=opt.PredBS,
                         shuffle=False,
@@ -105,7 +101,10 @@ def predict(opt):
                         drop_last=False)
 
     # Load Predict Network
-    net = MultiInfoNet(t0Int, mode=ParaDict['SGSMode'][0], in_channels=11, resize=Resize)
+    try:
+        net = MixNet(t0Int, NetType=ParaDict['NetType'][0], mode=ParaDict['SGSMode'][0], resize=Resize)
+    except:
+        net = MultiInfoNet(t0Int, mode=ParaDict['SGSMode'][0], in_channels=11, resize=Resize)
     if use_gpu:
         net = net.cuda(opt.GPUNO)
     net.eval()
@@ -118,6 +117,7 @@ def predict(opt):
     bar = tqdm(total=len(dlPred))
     # create dict to save auto picking results
     PickDict = {}   
+    PickDict2 = {'line': [], 'trace': [], 'time': [], 'velocity': []}
     # predict all of the dataset
     with torch.no_grad():
         for pwr, stkG, stkC, _, VMM, _, name in dlPred:
@@ -128,13 +128,26 @@ def predict(opt):
 
             out, _ = net(pwr, stkG, stkC, VMM, True)
             PredSeg = out.squeeze()
-
+            VInt = []
+            for n in name:
+                PwrIndex = np.array(H5Dict['pwr'][n]['SpecIndex'])
+                VInt.append(np.array(SegyDict['pwr'].attributes(segyio.TraceField.offset)[PwrIndex[0]: PwrIndex[1]]))
+            _, AutoPick = GetResult(PredSeg.squeeze().cpu().detach().numpy(), t0Int, VInt, threshold=0.2)
             for ind, name_single in enumerate(name):
-                PickDict.setdefault(name_single, PredSeg[ind].cpu().detach().numpy())
+                lineN, cdpN = name_single.split('_')
+                PickDict.setdefault(name_single, {'Seg': PredSeg[ind].cpu().detach().numpy(), 'VInt': VInt[ind], 'TInt': t0Int})
+                Picking = AutoPick[ind]
+                PickDict2['line'] += Picking.shape[0] * [int(lineN)]
+                PickDict2['trace'] += Picking.shape[0] * [int(cdpN)]
+                PickDict2['time'] += Picking[:, 0].astype(np.int).tolist()
+                PickDict2['velocity'] += Picking[:, 1].astype(np.int).tolist()
+
             bar.update(1)
 
     # Save result
     np.save(os.path.join(OutputPath, '0-PickDict.npy'), PickDict)
+    PickDF = pd.DataFrame(PickDict2)
+    PickDF.to_csv(os.path.join(OutputPath, '0-PickResults.csv'), index=False)
 
 
 if __name__ == '__main__':
