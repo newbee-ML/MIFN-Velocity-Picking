@@ -165,7 +165,6 @@ def train(opt):
     random.seed(123)
     VisualSample = random.sample(trainIndex, 16)
     print('Train Num %d, Valid Num %d' % (len(trainIndex), len(validIndex)))
-    return 0
     ##################################
     # build the data loader
     ##################################
