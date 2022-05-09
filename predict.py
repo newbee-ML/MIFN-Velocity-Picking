@@ -125,7 +125,7 @@ def predict(opt):
                 pwr = pwr.cuda(opt.GPUNO)
                 stkG = stkG.cuda(opt.GPUNO)
                 stkC = stkC.cuda(opt.GPUNO)
-
+            # plot_feature_map(pwr[0].detach().cpu().numpy(), 'FeatureMap.pdf')
             out, _ = net(pwr, stkG, stkC, VMM, True)
             PredSeg = out.squeeze()
             VInt = []

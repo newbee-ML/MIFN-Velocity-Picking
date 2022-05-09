@@ -203,15 +203,15 @@ def plot_feature_map(feature_map_tensor, save_path='xxx'):
     spectrum_array = feature_map_tensor[1:]
     font1 = {'family' : 'Times New Roman',
     'weight' : 'normal',
-    'size'   : 23,
+    'size'   : 30,
     }
     for ax, case in zip(axs, cases):
         spectrum = spectrum_array[count]
-        origin_pwr = 255 - (spectrum - np.min(spectrum)) / (np.max(spectrum) - np.min(spectrum)) * 255
+        origin_pwr = (spectrum - np.min(spectrum)) / (np.max(spectrum) - np.min(spectrum)) * 255
         data_plot = origin_pwr.astype(np.uint8)
-        data_plot_hot = cv2.applyColorMap(data_plot, cv2.COLORMAP_JET)
-        ax.imshow(data_plot_hot, aspect='auto')
+        ax.imshow(data_plot, cmap='seismic', aspect='auto')
         ax.set_title(case, font1)
+        ax.axis('off')
         count += 1
 
     plt.savefig(save_path, dpi=150, bbox_inches='tight')
@@ -655,14 +655,16 @@ def SampleLines(Path=None):
 
 # 5 plot the loss curve of train and valid
 def PlotLoss(LossDict, SavePath=None):
-    Colors = plt.colormaps['RdYlGn'](np.linspace(0.15, 0.85, len(list(LossDict.keys()))))
+    Colors = ['blue', 'red', 'green', 'black']
+    # https://coolors.co/palette/390099-9e0059-ff0054-ff5400
+    # plt.get_cmap('RdYlGn')(np.linspace(0.15, 0.85, len(list(LossDict.keys()))))
     fig, ax = plt.subplots(figsize=(3, 3))
     for ind, (sr, loss_dict) in enumerate(LossDict.items()):
         TC, VC = np.array(loss_dict['train']), np.array(loss_dict['valid'])
-        ax.plot(TC[:, 0], TC[:, 1], c=Colors[ind], label='SR=%.1f-train'%sr, alpha=0.5, linewidth=1)
-        ax.plot(VC[:, 0], VC[:, 1], '*', markersize=3, c=Colors[ind], label='SR=%.1f-valid'%sr, alpha=0.5)
+        ax.plot(TC[:, 0], TC[:, 1], c=Colors[ind], label='SR=%.1f-train'%sr, linewidth=1, alpha=0.8)
+        ax.plot(VC[:, 0], VC[:, 1], '--', markersize=0.7, c=Colors[ind], label='SR=%.1f-valid'%sr, alpha=0.8, linewidth=1)
     # ax.set_xscale('log', base=2)
-    ax.set_yscale('log', base=2)
+    ax.set_yscale('log', base=10)
     ax.set_xlabel('Iteration', fontsize=12)
     ax.set_ylabel('Loss', fontsize=12)
     ax.grid(True)

@@ -151,7 +151,6 @@ def test(opt):
                     pwr = pwr.cuda(opt.GPUNO)
                     stkG = stkG.cuda(opt.GPUNO)
                     stkC = stkC.cuda(opt.GPUNO)
-                
                 out, feature = net(pwr, stkG, stkC, VMM, True)
                 PredSeg = out.squeeze()
 

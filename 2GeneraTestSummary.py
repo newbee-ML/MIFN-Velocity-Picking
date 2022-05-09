@@ -9,6 +9,7 @@ from utils.LoadData import GetDataDict, LoadSingleData
 import sys
 from tqdm import tqdm
 
+
 ############################################
 # summary validation results
 ############################################
@@ -178,8 +179,6 @@ def PlotTestVMAE(RootPath):
     for data, df in TestData:
         TestDict.setdefault(data, df[['SeedRate', 'TestVMAE']].values)
     VMAETest(TestDict, os.path.join(RootPath, 'VMAETest.pdf'))
-    
-
 
 
 if __name__ == "__main__":
@@ -194,5 +193,5 @@ if __name__ == "__main__":
     # SummaryTestResults(optN)
     # VisualResults(optN)
     PlotLossCurve(EpList, optN.LoadRoot)
-    PlotTestVMAE(optN.LoadRoot)
+    # PlotTestVMAE(optN.LoadRoot)
     
